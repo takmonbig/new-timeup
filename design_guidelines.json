@@ -1,0 +1,88 @@
+{
+  "theme": "dark",
+  "typography": {
+    "headings": "Unbounded",
+    "body": "IBM Plex Sans",
+    "monospace": "JetBrains Mono",
+    "instructions": "Use Unbounded for H1-H4 headings with tight tracking for a premium gaming/tech feel. Use IBM Plex Sans for legible body text. Use JetBrains Mono for the large stopwatch timer digits."
+  },
+  "colors": {
+    "background": "#050505",
+    "foreground": "#FFFFFF",
+    "accent": "#FF2A2A",
+    "accent_hover": "#FF4D4D",
+    "card": "#0F0F0F",
+    "card_border": "rgba(255, 255, 255, 0.1)",
+    "instructions": "Use neon red (#FF2A2A) sparingly as the key accent for CTAs, active states, and live indicators. Base layout must be deep void black (#050505) and charcoal. Never use generic dark grey."
+  },
+  "visual_enhancers": {
+    "surfaces": "Use Glassmorphism (bg-black/60 backdrop-blur-xl border-b border-white/10) for headers. Never use fully transparent headers. Use Tracing Beam effect for active Challenge Slots.",
+    "effects": "Neon glows on hover. 1px solid strokes or 2px 'Inner Glow' highlights."
+  },
+  "layouts": {
+    "spacing": "Generous spacing. Tailwind scale: p-4, p-6, p-8, p-12. Containers with borders must have internal padding.",
+    "grid": "High Density Grid for the dashboard and room lists. Bento Grid for the marketing/home page. Mobile-first layout."
+  },
+  "motion": {
+    "library": "framer-motion",
+    "guidelines": "Use framer-motion for the large animated stopwatch (scale, blur effects). Micro-interactions on all buttons. Staggered entrance animations for multiplayer room lists. Avoid universal `transition: all`."
+  },
+  "accessibility": {
+    "contrast": "Ensure text over red or dark backgrounds meets APCA contrast ratios. Use text-shadow if needed.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., data-testid='stopwatch-stop-button')."
+  },
+  "components": {
+    "icons": "lucide-react",
+    "toast": "sonner (at /app/frontend/src/components/ui/sonner.js)",
+    "rules": "Use Shadcn/UI for tables, forms, dialogues. Go cardless or use sharp edges for dashboards. DO NOT use generic card wrappers for marketing sections."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1542751371-adc38448a05e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxlc3BvcnRzJTIwZ2FtZXIlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODg0MjMzMjR8MA&ixlib=rb-4.1.0&q=85",
+        "category": "Hero Background / Marketing",
+        "description": "Person sitting on gaming chair playing video game - perfect for hero section background with overlay."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1676746424139-77f8bd8922a8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHw0fHxzdGFkaXVtJTIwYXJlbmElMjBsaWdodHMlMjBkYXJrfGVufDB8fHx8MTc4ODQyMzMyNHww&ixlib=rb-4.1.0&q=85",
+        "category": "Arena / Challenge Rooms",
+        "description": "Soccer field at night with stadium lights - use for room thumbnails or ambient background."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1534423861386-85a16f5d13fd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwzfHxlc3BvcnRzJTIwZ2FtZXIlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODg0MjMzMjR8MA&ixlib=rb-4.1.0&q=85",
+        "category": "Feature Section",
+        "description": "Person using computer playing FPS game."
+      }
+    ]
+  },
+  "3d_libraries": {
+    "recommendation": "Use framer-motion instead of 3D libraries. 2D precision is critical for a stopwatch. Add visual depth using SVG animated circular progress bars with drop-shadow glows to simulate a premium HUD.",
+    "instructions": "Combine framer-motion for number counting and smooth scaling, and requestAnimationFrame for high-performance stopwatch state."
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. This results in breaking transforms. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }` in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN."
+  ],
+  "instructions_to_main_agent": [
+    "1. In tailwind.config.js, update colors to set primary accent to neon red (#FF2A2A) and dark mode base to void black (#050505).",
+    "2. Add fonts Unbounded, IBM Plex Sans, and JetBrains Mono from Google Fonts in index.html.",
+    "3. Delete App.css content that centers everything, especially `.App-header` styles. It ruins layout.",
+    "4. The main visual is the LARGE STOPWATCH. Make it enormous, center it visually within its container (not whole page text-center), use JetBrains Mono, and add a subtle red text-shadow glow when running.",
+    "5. Use Shadcn components for Wallet, Admin Panel, and Tables. Ensure all Shadcn components are created as .js files, not .tsx.",
+    "6. Build a custom Grid/Bento layout for the Home Marketing page, using the provided images with bg-black/50 overlay.",
+    "7. Implement strict testing attributes (data-testid) on all buttons, forms, and the main stopwatch.",
+    "8. Use Framer Motion for room cards entering the viewport and the countdown before game starts.",
+    "9. Use lucide-react for all iconography."
+  ]
+}

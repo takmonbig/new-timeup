@@ -1689,6 +1689,21 @@ async def admin_bulk_action(body: BulkActionReq, admin: dict = Depends(require_a
     return {"message": f"{body.action} applied to {done} users", "count": done}
 
 
+@api.post("/admin/cleanup-test-accounts")
+async def admin_cleanup_test_accounts(admin: dict = Depends(require_admin)):
+    res = await db.users.delete_many({
+        "role": {"$ne": "admin"},
+        "$or": [{"display_name": {"$regex": "^test", "$options": "i"}},
+                {"full_name": {"$regex": "^test", "$options": "i"}},
+                {"username": {"$regex": "^test", "$options": "i"}},
+                {"is_test": True}],
+    })
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()), "admin_id": str(admin["_id"]),
+        "action": "cleanup_test_accounts", "count": res.deleted_count, "created_at": now_iso()})
+    return {"message": f"Removed {res.deleted_count} test accounts", "count": res.deleted_count}
+
+
 @api.get("/admin/custom-rooms")
 async def admin_custom_rooms(admin: dict = Depends(require_admin)):
     rooms = await db.rooms.find({"is_custom": True}).sort("created_at", -1).to_list(200)
@@ -1827,17 +1842,6 @@ async def startup():
         except Exception as e:
             logger.warning(f"index {field} skipped: {e}")
     await seed_admin()
-    # remove demo/test accounts before client hand-off
-    try:
-        await db.users.delete_many({
-            "role": {"$ne": "admin"},
-            "$or": [{"display_name": {"$regex": "test", "$options": "i"}},
-                    {"full_name": {"$regex": "test", "$options": "i"}},
-                    {"username": {"$regex": "^test", "$options": "i"}},
-                    {"is_test": True}],
-        })
-    except Exception as e:
-        logger.warning(f"test cleanup skipped: {e}")
     await get_config()
     asyncio.create_task(room_manager_loop())
     logger.info("TIMEUP API started")

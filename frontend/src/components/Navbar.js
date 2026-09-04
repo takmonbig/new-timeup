@@ -14,7 +14,7 @@ export function Navbar() {
 
   useEffect(() => {
     if (user) api.get("/wallet").then(({ data }) => setBalance(data.total_balance)).catch(() => {});
-  }, [user, loc.pathname]);
+  }, [user?.id, loc.pathname]);
 
   useEffect(() => {
     const refetch = () => api.get("/wallet").then(({ data }) => setBalance(data.total_balance)).catch(() => {});

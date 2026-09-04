@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Users, Clock, Coins, Loader2, Swords } from "lucide-react";
-import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { showPopup } from "@/components/CenterPopup";
@@ -46,7 +45,6 @@ export function RoomList({ mode, title, subtitle, Icon = Users, payoutLabel }) {
     setBusy(true);
     try {
       await api.post(`/rooms/${confirm.id}/join`);
-      toast.success("Joined room!");
       window.dispatchEvent(new Event("wallet:refresh"));
       const id = confirm.id; setConfirm(null); nav(`/room/${id}`);
     } catch (e) {

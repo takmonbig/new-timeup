@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Loader2, Eye, EyeOff, Phone, User } from "lucide-react";
-import { toast } from "sonner";
+import { Loader2, Eye, EyeOff, Phone, User, Gift } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatApiError } from "@/lib/api";
 import { LOGO_URL } from "@/lib/brand";
@@ -10,7 +9,7 @@ import { LOGO_URL } from "@/lib/brand";
 export default function Register() {
   const { register } = useAuth();
   const nav = useNavigate();
-  const [form, setForm] = useState({ full_name: "", mobile: "", password: "" });
+  const [form, setForm] = useState({ full_name: "", mobile: "", password: "", referral_code: "" });
   const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,7 +19,6 @@ export default function Register() {
     setErr(""); setBusy(true);
     try {
       await register(form);
-      toast.success("Account created! Welcome to TIMEUP.");
       nav("/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);
@@ -65,6 +63,15 @@ export default function Register() {
                   className="px-4 text-white/40 hover:text-white transition-colors">
                   {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-wider text-white/50">Referral Code (optional)</label>
+              <div className="mt-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
+                <Gift className="h-4 w-4 text-white/40 ml-4" />
+                <input data-testid="register-referral" value={form.referral_code}
+                  onChange={(e) => setForm({ ...form, referral_code: e.target.value.toUpperCase() })}
+                  className="w-full bg-transparent px-3 py-3 outline-none" placeholder="Have a code? Get 10 bonus coins" />
               </div>
             </div>
             {err && <p data-testid="register-error" className="text-sm text-pazer-red">{err}</p>}

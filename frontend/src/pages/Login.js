@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, Phone } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { formatApiError } from "@/lib/api";
 import { LOGO_URL } from "@/lib/brand";
@@ -21,7 +20,6 @@ export default function Login() {
     setErr(""); setBusy(true);
     try {
       const u = await login(mobile, password);
-      toast.success("Welcome back!");
       nav(u.role === "admin" ? "/admin" : "/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);

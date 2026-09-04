@@ -5,6 +5,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { WinTicker } from "@/components/WinTicker";
 import { SciFiBackground } from "@/components/SciFiBackground";
 import { CenterPopupHost } from "@/components/CenterPopup";
+import { WinCelebrationHost } from "@/components/WinCelebration";
+import { QuickActions } from "@/components/QuickActions";
 import { Timer } from "lucide-react";
 
 function Loader() {
@@ -21,13 +23,14 @@ export function ProtectedRoute({ adminOnly }) {
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== "admin") return <Navigate to="/home" replace />;
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-28">
       <SciFiBackground />
       <CenterPopupHost />
+      <WinCelebrationHost />
       <div className="pz-content">
         <Navbar />
         <Outlet />
-        {!adminOnly && <><WinTicker /><BottomNav /></>}
+        {!adminOnly && <><WinTicker /><QuickActions /><BottomNav /></>}
       </div>
     </div>
   );

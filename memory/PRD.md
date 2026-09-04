@@ -69,3 +69,17 @@ UX/feature overhaul (verified iter5 14/14 + full regression, all critical fronte
 - Loss -> encouraging popup to replay the SAME bet+target instantly (win 5x message).
 - KYC replaced Aadhaar with payout method: UPI (id+name) or Bank (acc no, name, IFSC, bank).
 - Completed rooms show only COMPLETED (no refunded/cancelled); TEST users hidden from leaderboard.
+
+## Iteration 6 — Referrals, Custom Rooms, Real Deposit Flow, Win FX, Admin Superpowers (2026-06)
+- **Notifications**: removed sonner Toaster site-wide; ALL feedback now via center popup (`CenterPopup`) incl. new `success` type. Deleted dead pages PlayFixed.js, Rooms.js.
+- **Win celebration**: `WinCelebration` coin-burst overlay + WebAudio chord on every win (Fixed, 1v1, Rooms). `showWin(prize)`.
+- **Insufficient-balance popup**: quick recharge ₹100/₹500/₹1000 + Add Coins (navigates to /wallet?deposit=amt).
+- **Room/1v1 fix**: replaced broken auto-start with per-player MANUAL START→STOP. Added `/rooms/{id}/begin` storing per-player `started_at` so latency anti-cheat is fair. Room LIVE window = target+5s (`ROOM_EXTRA_SECONDS`). On completion RoomGame refreshes wallet + shows win celebration (fixed "win popup missing / wallet not increasing").
+- **Custom rooms (Play with Friends)**: `/rooms/custom` (1v1 min 50 / multiplayer min 30, 10-min window, host auto-joins), `/rooms/join-code`, host `/rooms/{id}/start`. Excluded from bot-fill/auto-start/public lists; auto-refund if never started. 1v1 winner takes 2x, multiplayer winner takes full pool (0 platform fee).
+- **Referral**: signup `referral_code` → both get 10 coins; `pay_referral_commission` credits referrer 7.5% of referee lost entry / 2.5% of referee win. Own code on user (`referral_code`). Footer bubbles: QuickActions (custom + Refer&Earn modals).
+- **Deposit overhaul (no more demo)**: `/wallet/deposit` now creates a pending request (UPI 1₹=1coin / USDT-TRC20 1USDT=100coin min 10) with Cloudinary screenshot upload (`/api/upload`). Admin `/admin/deposits` + `/action` approve (credits) or reject (problem message shown to user + `/wallet/deposit-requests/{id}/resubmit`). Payment page reads `/api/payment-info` (admin-configured QR/UPI id/name/threshold, USDT QR/address/rate).
+- **Admin superpowers**: add/remove coins (`/admin/users/{id}/wallet`), reset password, delete user, user detail (games/wins/spent/referral + lost_last_3 hint), live activity (`/admin/live`), Payments config tab (QR upload), Referral config, "Let Win" (`force_win` → next Fixed Challenge auto-wins at exact target).
+- **Ticker/leaderboard**: added foreign names to pools; ticker mode label Room→Multiplayer.
+- **Cloudinary** configured in backend/.env (server-side upload, folders timeup/payment_qr|payment_proof).
+- Verified: backend full flow via curl/python (referral bonus+commission, custom create/join/start/stop/winner/prize, deposit approve/reject, force-win, admin wallet) ALL PASS. Frontend via testing_agent iter6 (auth, no-toasts, custom/referral modals, admin tabs, wallet deposit) + screenshots (insufficient-balance quick-recharge popup, header balance fix).
+- Admin: `9999999999` / `Admin@123`. New users start at 0 coins (admin credits or deposit).

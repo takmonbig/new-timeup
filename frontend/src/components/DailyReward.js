@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Gift, Flame, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
+import { showPopup } from "@/components/CenterPopup";
 
 export function DailyReward() {
   const [info, setInfo] = useState(null);
@@ -16,10 +16,10 @@ export function DailyReward() {
     setBusy(true);
     try {
       const { data } = await api.post("/streak/claim");
-      toast.success(`+${data.bonus} coins! ${data.streak}-day streak 🔥`);
+      showPopup({ type: "success", title: "Reward claimed!", message: `+${data.bonus} coins · ${data.streak}-day streak!` });
       window.dispatchEvent(new Event("wallet:refresh"));
       setInfo({ ...info, can_claim: false, streak: data.streak });
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    } catch (e) { showPopup({ type: "warning", title: "Can't claim", message: formatApiError(e.response?.data?.detail) }); }
     finally { setBusy(false); }
   };
 

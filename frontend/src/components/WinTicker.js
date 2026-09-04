@@ -4,7 +4,9 @@ import { Trophy } from "lucide-react";
 
 const NAMES = ["Palak", "Rohan", "Aisha", "Vikram", "Neha", "Arjun", "Sana", "Karan", "Priya", "Dev",
   "Meera", "Aditya", "Riya", "Sahil", "Tanvi", "Yash", "Isha", "Kabir", "Anaya", "Manish",
-  "Simran", "Rahul", "Diya", "Nikhil", "Pooja", "Aryan", "Kavya", "Harsh", "Zoya", "Varun"];
+  "Simran", "Rahul", "Diya", "Nikhil", "Pooja", "Aryan", "Kavya", "Harsh", "Zoya", "Varun",
+  "Alexei", "Daniel", "Sofia", "Lucas", "Emma", "Mateo", "Olivia", "Liam", "Nadia", "Marco",
+  "Chloe", "Diego", "Aiko", "Hassan", "Elena", "Omar", "Viktor", "Layla", "Yuki", "Ivan"];
 
 function make() {
   const name = NAMES[Math.floor(Math.random() * NAMES.length)];
@@ -12,7 +14,7 @@ function make() {
   let bet, mult, mode;
   if (dice < 0.5) { bet = [20, 50, 100, 200, 500, 1000][Math.floor(Math.random() * 6)]; mult = 5; mode = "Fixed"; }
   else if (dice < 0.8) { bet = 50; mult = 1.5; mode = "1v1"; }
-  else { bet = 50; mult = [3, 5, 8, 12][Math.floor(Math.random() * 4)]; mode = "Room"; }
+  else { bet = 50; mult = [3, 5, 8, 12][Math.floor(Math.random() * 4)]; mode = "Multiplayer"; }
   const win = Math.round(bet * mult);
   return { id: Math.random().toString(36).slice(2), name, bet, win, mode };
 }
@@ -24,7 +26,7 @@ export function WinTicker() {
     return () => clearInterval(i);
   }, []);
   return (
-    <div className="fixed bottom-[60px] inset-x-0 z-40 pointer-events-none" data-testid="win-ticker">
+    <div className="fixed bottom-[112px] inset-x-0 z-40 pointer-events-none" data-testid="win-ticker">
       <div className="mx-auto max-w-md px-3">
         <AnimatePresence mode="wait">
           <motion.div key={item.id}

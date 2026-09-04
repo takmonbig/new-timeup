@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Target, Loader2, Trophy, RotateCcw, Coins, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import Stopwatch from "@/components/Stopwatch";
 import { DailyReward } from "@/components/DailyReward";
 import { Guide } from "@/components/Guide";
 import { showPopup } from "@/components/CenterPopup";
+import { showWin } from "@/components/WinCelebration";
 
 const QUICK_BETS = [20, 50, 100, 200, 500];
 
@@ -73,7 +73,7 @@ export default function GameHome() {
       setResult(data);
       setPhase("result");
       window.dispatchEvent(new Event("wallet:refresh"));
-      if (data.won) toast.success(`Bullseye! +${data.prize} coins`);
+      if (data.won) showWin(data.prize);
       else setTimeout(() => setLossModal(true), 500);
     } catch (e) {
       showPopup({ type: "warning", title: "Something went wrong", message: formatApiError(e.response?.data?.detail) });

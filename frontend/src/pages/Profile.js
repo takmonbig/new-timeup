@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { User, ShieldCheck, BadgeCheck, Loader2, Copy, Wallet as WalletIcon, Trophy, Target, TrendingUp, Flame, Phone } from "lucide-react";
-import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { showPopup } from "@/components/CenterPopup";
 
 const KYC_BADGE = {
   not_submitted: { t: "Not Submitted", c: "bg-white/10 text-white/60" },
@@ -28,8 +28,8 @@ export default function Profile() {
     e.preventDefault(); setBusy(true);
     try {
       await api.post("/kyc", kyc);
-      toast.success("KYC submitted for review"); refreshUser();
-    } catch (e2) { toast.error(formatApiError(e2.response?.data?.detail)); }
+      showPopup({ type: "success", title: "KYC submitted", message: "Your details are under review." }); refreshUser();
+    } catch (e2) { showPopup({ type: "warning", title: "Couldn't submit", message: formatApiError(e2.response?.data?.detail) }); }
     finally { setBusy(false); }
   };
 
@@ -56,7 +56,7 @@ export default function Profile() {
         </div>
         <div className="min-w-0">
           <h1 className="font-display font-bold text-xl truncate">{user?.display_name}</h1>
-          <button onClick={() => { navigator.clipboard.writeText(user?.username); toast("Username copied"); }}
+          <button onClick={() => { navigator.clipboard.writeText(user?.username); showPopup({ type: "success", title: "Copied", message: "Username copied to clipboard." }); }}
             className="text-sm text-white/50 flex items-center gap-1 hover:text-pazer-red transition-colors" data-testid="profile-username">
             @{user?.username} <Copy className="h-3 w-3" />
           </button>

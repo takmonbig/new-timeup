@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post("/auth/login", { mobile, password });
     if (data.token) localStorage.setItem("pazer_token", data.token);
     setUser(data.user);
+    window.dispatchEvent(new Event("wallet:refresh"));
     return data.user;
   };
 
@@ -38,6 +39,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post("/auth/register", payload);
     if (data.token) localStorage.setItem("pazer_token", data.token);
     setUser(data.user);
+    window.dispatchEvent(new Event("wallet:refresh"));
     return data.user;
   };
 

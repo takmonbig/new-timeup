@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 3 (BOTS + DAILY STREAK + WEEKLY LEADERBOARD) fully verified. Added /app/backend/tests/test_iter3.py with 8 new pytest cases; all PASS. Full regression suite (backend_test.py 24 tests) also 24/24 PASS => 32/32 backend tests green via public REACT_APP_BACKEND_URL. Frontend Playwright E2E on mobile viewport: register -> /home shows DailyReward card (data-testid=daily-reward) -> claim-streak-btn credits +5 bonus coins and header balance updates to 5 -> after claim streak flame shows '1-day streak!' and claim button removed -> BottomNav renders all 5 tabs (home/1v1/rooms/ranks/profile) -> bottomnav-ranks navigates to /leaderboard with podium (top-3) + leaderboard-list (8 promo rows + real TEST_ winners visible at #9/#10) -> admin login (9999999999/Admin@123) loads /admin with new sections showing toggle-bots, toggle-streak, toggle-leaderboard, save-config-btn -> Save Configuration shows 'Configuration saved' toast. Bot-fill 1v1 flow verified end-to-end via backend test: human joins OPEN 1v1 room -> within ~10s bot participant added, status transitions to LIVE, bot auto-submits, human stops near target, room finalizes COMPLETED with a winner (prize>0). Leaderboard admin-off correctly removes promo entries.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter3_results.xml",
+    "/app/test_reports/pytest/iter3_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now 1270 lines and continues to grow (added streak, leaderboard, bot loop). Strongly recommend splitting into routers (auth, wallet, games, rooms, admin, streak, leaderboard, bots).",
+    "weekly_leaderboard aggregation query filters by created_at (string ISO) which works only because inserted values are ISO-8601 strings; keep this consistent when adding new game insert paths.",
+    "Bot fill only runs when >=1 human is already in the room (correct per PRD). Multiplayer bot-fill code path exists but was not exercised in this iteration's automated tests (skipped scenario documented in PRD).",
+    "leaderboard promo entries are randomised with seed derived from today_str() -> stable within a day (verified visually).",
+    "finalize_room correctly skips bot participants for wallet/stats updates (is_bot check confirmed at line 947)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter3.py"],
+  "success_rate": {"backend": "100% (32/32)", "frontend": "100% of tested flows"},
+  "test_credentials": "Admin 9999999999 / Admin@123 verified. Test users registered dynamically.",
+  "seed_data_creation": "Multiple TEST_ users created via register during pytest and Playwright; a real user winning a fixed game contributed to leaderboard real-winners rank #9/#10.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_iter3.py covers: streak GET/claim/409, leaderboard shape + admin-disable, admin config merges bot/streak/leaderboard sections, and full 1v1 bot-fill->LIVE->finalize flow. Regression: backend_test.py (24 tests). To test multiplayer bot-fill, join a multiplayer room (mode=multiplayer) with a real user, wait ~10s for bots to top up to min_players, then LIVE and finalize. For UI, header now reflects streak bonus in coins pill (5 after first claim).",
+  "rca of the issue": "No defects found."
+}

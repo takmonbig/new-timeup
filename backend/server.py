@@ -9,6 +9,7 @@ import asyncio
 import logging
 import uuid
 import secrets
+import random
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
@@ -81,15 +82,46 @@ DEFAULT_CONFIG = {
         "room_duration_minutes": 30,
         "targets": [5, 8, 10, 13, 15, 18, 20, 23, 25, 30],
     },
+    "bot_config": {
+        "enabled": True,
+        "fill_1v1": True,
+        "fill_multiplayer": True,
+        "join_delay_seconds": 3,
+        "error_range": 0.25,
+    },
+    "streak_config": {
+        "enabled": True,
+        "daily_bonus": 5,
+    },
+    "leaderboard_config": {
+        "enabled": True,
+        "auto_generate": True,
+        "fake_count": 8,
+        "min_win": 500,
+        "max_win": 25000,
+        "name_pool": ["Palak", "Rohan", "Aisha", "Vikram", "Neha", "Arjun", "Sana", "Karan",
+                      "Priya", "Dev", "Meera", "Aditya", "Riya", "Sahil", "Yash", "Isha",
+                      "Kabir", "Manish", "Simran", "Rahul", "Diya", "Nikhil", "Pooja", "Kavya"],
+        "manual_entries": [],
+    },
 }
+
+
+BOT_NAMES = ["Aarav", "Ishaan", "Ananya", "Vivaan", "Diya", "Kiara", "Reyansh", "Saanvi",
+             "Advik", "Myra", "Kabir", "Aadhya", "Vihaan", "Anika", "Arnav", "Navya",
+             "Shaurya", "Aaradhya", "Krish", "Prisha", "Rudra", "Tara", "Veer", "Zara"]
 
 
 async def get_config() -> dict:
     cfg = await db.config.find_one({"id": "global"}, {"_id": 0})
-    if not cfg or "fixed_config" not in cfg or "room_1v1_config" not in cfg:
-        await db.config.delete_many({"id": "global"})
+    if not cfg:
         await db.config.insert_one(dict(DEFAULT_CONFIG))
-        cfg = dict(DEFAULT_CONFIG)
+        return dict(DEFAULT_CONFIG)
+    # merge any newly-added top-level keys without wiping admin customisations
+    missing = {k: v for k, v in DEFAULT_CONFIG.items() if k not in cfg}
+    if missing:
+        await db.config.update_one({"id": "global"}, {"$set": missing})
+        cfg.update(missing)
     return cfg
 
 
@@ -661,6 +693,84 @@ async def user_stats(user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Daily login streak
+# ---------------------------------------------------------------------------
+def today_str() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+@api.get("/streak")
+async def get_streak(user: dict = Depends(get_current_user)):
+    cfg = await get_config()
+    sc = cfg.get("streak_config", {})
+    u = await get_user_by_id(str(user["_id"]))
+    last = u.get("streak_last_claim")
+    return {
+        "enabled": sc.get("enabled", True),
+        "daily_bonus": sc.get("daily_bonus", 5),
+        "streak": u.get("streak_count", 0),
+        "can_claim": sc.get("enabled", True) and last != today_str(),
+        "last_claim": last,
+    }
+
+
+@api.post("/streak/claim")
+async def claim_streak(user: dict = Depends(get_current_user)):
+    cfg = await get_config()
+    sc = cfg.get("streak_config", {})
+    if not sc.get("enabled", True):
+        raise HTTPException(status_code=403, detail="Daily rewards are disabled")
+    u = await get_user_by_id(str(user["_id"]))
+    today = today_str()
+    if u.get("streak_last_claim") == today:
+        raise HTTPException(status_code=409, detail="Already claimed today")
+    yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+    streak = u.get("streak_count", 0) + 1 if u.get("streak_last_claim") == yesterday else 1
+    bonus = sc.get("daily_bonus", 5)
+    await db.users.update_one({"_id": u["_id"]}, {"$set": {"streak_last_claim": today, "streak_count": streak}})
+    await credit_wallet(str(user["_id"]), bonus, "bonus", "bonus",
+                        meta={"reason": "daily_streak", "streak": streak})
+    return {"claimed": True, "streak": streak, "bonus": bonus, "can_claim": False,
+            "wallet": await get_wallet(user)}
+
+
+# ---------------------------------------------------------------------------
+# Weekly leaderboard (real winners + auto-changing promotional entries)
+# ---------------------------------------------------------------------------
+@api.get("/leaderboard/weekly")
+async def weekly_leaderboard(user: dict = Depends(get_current_user)):
+    cfg = await get_config()
+    lc = cfg.get("leaderboard_config", {})
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    agg = await db.games.aggregate([
+        {"$match": {"created_at": {"$gte": week_ago}, "prize": {"$gt": 0}}},
+        {"$group": {"_id": "$user_id", "coins": {"$sum": "$prize"}}},
+        {"$sort": {"coins": -1}}, {"$limit": 30},
+    ]).to_list(30)
+    entries = []
+    my_id = str(user["_id"])
+    for a in agg:
+        u = await db.users.find_one({"_id": ObjectId(a["_id"])}) if ObjectId.is_valid(a["_id"]) else None
+        if not u or u.get("role") == "admin":
+            continue
+        entries.append({"name": u.get("display_name") or u.get("username"),
+                        "coins": round(a["coins"], 2), "is_you": a["_id"] == my_id})
+    # promotional entries (manual + auto-generated, stable per day)
+    if lc.get("enabled", True):
+        for e in lc.get("manual_entries", []):
+            entries.append({"name": e.get("name", "Player"), "coins": e.get("coins", 0), "is_you": False})
+        if lc.get("auto_generate", True):
+            rng = random.Random(int(today_str().replace("-", "")))
+            pool = lc.get("name_pool", []) or ["Player"]
+            k = min(lc.get("fake_count", 8), len(pool))
+            for name in rng.sample(pool, k):
+                coins = rng.randint(lc.get("min_win", 500), lc.get("max_win", 25000))
+                entries.append({"name": name, "coins": round(coins / 50) * 50, "is_you": False})
+    entries.sort(key=lambda x: x["coins"], reverse=True)
+    return [{"rank": i + 1, **e} for i, e in enumerate(entries[:25])]
+
+
+# ---------------------------------------------------------------------------
 # Multiplayer rooms
 # ---------------------------------------------------------------------------
 def room_public(room: dict) -> dict:
@@ -834,6 +944,8 @@ async def finalize_room(room: dict):
     # pay winners and record games
     for p in participants:
         won = p.get("prize", 0) > 0
+        if p.get("is_bot"):
+            continue  # bots have no wallet/stats
         if won:
             await credit_wallet(p["user_id"], p["prize"], "prize", "main",
                                 meta={"mode": "room", "room_id": room["id"]})
@@ -895,7 +1007,40 @@ async def room_manager_loop():
         try:
             cfg = await get_config()
             now = datetime.now(timezone.utc)
-            # transition OPEN/FULL rooms past deadline
+            bot_cfg = cfg.get("bot_config", {})
+            error_range = bot_cfg.get("error_range", 0.25)
+
+            # ---- Bot fill: fill rooms that already have a real player ----
+            if bot_cfg.get("enabled"):
+                fill_rooms = await db.rooms.find({"status": {"$in": ["OPEN", "FULL"]}}).to_list(200)
+                for room in fill_rooms:
+                    parts = room["participants"]
+                    humans = [p for p in parts if not p.get("is_bot")]
+                    if not humans:
+                        continue
+                    if room["mode"] == "1v1" and not bot_cfg.get("fill_1v1", True):
+                        continue
+                    if room["mode"] == "multiplayer" and not bot_cfg.get("fill_multiplayer", True):
+                        continue
+                    target_count = 2 if room["mode"] == "1v1" else room["min_players"]
+                    if len(parts) >= target_count:
+                        continue
+                    earliest = min(datetime.fromisoformat(h["joined_at"]) for h in humans)
+                    if (now - earliest).total_seconds() < bot_cfg.get("join_delay_seconds", 3):
+                        continue
+                    used = {p["username"] for p in parts}
+                    while len(parts) < target_count:
+                        name = random.choice([n for n in BOT_NAMES if n not in used] or BOT_NAMES)
+                        used.add(name)
+                        parts.append({"user_id": "bot_" + uuid.uuid4().hex[:8], "username": name,
+                                      "is_bot": True, "joined_at": now_iso(), "submitted": False})
+                    new_status = "FULL" if len(parts) >= room["max_players"] else room["status"]
+                    upd = {"participants": parts, "status": new_status}
+                    # start immediately once the bot fill reaches the required count
+                    upd["join_deadline"] = now.isoformat()
+                    await db.rooms.update_one({"id": room["id"]}, {"$set": upd})
+
+            # ---- transition OPEN/FULL rooms that are ready ----
             open_rooms = await db.rooms.find({"status": {"$in": ["OPEN", "FULL"]}}).to_list(200)
             for room in open_rooms:
                 deadline = datetime.fromisoformat(room["join_deadline"])
@@ -904,18 +1049,30 @@ async def room_manager_loop():
                     continue
                 if len(room["participants"]) >= room["min_players"]:
                     live_start = datetime.now(timezone.utc).timestamp()
+                    parts = room["participants"]
+                    # bots stop instantly with a configurable spread around the target
+                    for p in parts:
+                        if p.get("is_bot") and not p.get("submitted"):
+                            rec = max(0.05, round(room["target"] + random.gauss(0, error_range), 3))
+                            p["recorded"] = rec
+                            p["diff"] = round(abs(rec - room["target"]), 3)
+                            p["flagged"] = False
+                            p["submitted"] = True
+                            p["stopped_at"] = live_start + rec
                     await db.rooms.update_one({"id": room["id"]}, {"$set": {
-                        "status": "LIVE", "live_start": live_start,
+                        "status": "LIVE", "live_start": live_start, "participants": parts,
                         "live_deadline": (now + timedelta(seconds=ROOM_PLAY_WINDOW)).isoformat()}})
                     upd = await db.rooms.find_one({"id": room["id"]})
                     await manager.broadcast(room["id"], {"event": "started", "room": room_public(upd)})
                 elif now >= deadline:
                     await refund_room(room)
-            # finalize LIVE rooms past play window
+
+            # ---- finalize LIVE rooms (all submitted or window passed) ----
             live_rooms = await db.rooms.find({"status": "LIVE"}).to_list(200)
             for room in live_rooms:
                 ld = datetime.fromisoformat(room["live_deadline"]) if room.get("live_deadline") else None
-                if ld and now >= ld:
+                all_done = room["participants"] and all(p.get("submitted") for p in room["participants"])
+                if all_done or (ld and now >= ld):
                     await finalize_room(room)
             # ensure auto rooms exist per target (multiplayer)
             rc = cfg["room_config"]

@@ -4,6 +4,7 @@ import { Target, Loader2, Trophy, XCircle, RotateCcw, Coins } from "lucide-react
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import Stopwatch from "@/components/Stopwatch";
+import { DailyReward } from "@/components/DailyReward";
 
 const QUICK_BETS = [20, 50, 100, 200, 500];
 
@@ -70,6 +71,7 @@ export default function GameHome() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
+      {phase === "select" && <DailyReward />}
       <div className="flex items-center gap-2 mb-1">
         <Target className="h-5 w-5 text-pazer-red" />
         <h1 className="font-display font-bold text-2xl tracking-tight">Fixed Challenge</h1>

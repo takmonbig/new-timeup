@@ -9,6 +9,7 @@ import Splash from "@/pages/Splash";
 import GameHome from "@/pages/GameHome";
 import OneVsOne from "@/pages/OneVsOne";
 import Multiplayer from "@/pages/Multiplayer";
+import Leaderboard from "@/pages/Leaderboard";
 import RoomGame from "@/pages/RoomGame";
 import Wallet from "@/pages/Wallet";
 import Profile from "@/pages/Profile";
@@ -32,6 +33,7 @@ function App() {
               <Route path="/home" element={<GameHome />} />
               <Route path="/1v1" element={<OneVsOne />} />
               <Route path="/multiplayer" element={<Multiplayer />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/room/:id" element={<RoomGame />} />
               <Route path="/wallet" element={<Wallet />} />
               <Route path="/profile" element={<Profile />} />

@@ -77,6 +77,9 @@ export default function Admin() {
   const updRoom = (k, v) => setCfg((c) => ({ ...c, room_config: { ...c.room_config, [k]: v } }));
   const updFixed = (k, v) => setCfg((c) => ({ ...c, fixed_config: { ...c.fixed_config, [k]: v } }));
   const updV1 = (k, v) => setCfg((c) => ({ ...c, room_1v1_config: { ...c.room_1v1_config, [k]: v } }));
+  const updBot = (k, v) => setCfg((c) => ({ ...c, bot_config: { ...c.bot_config, [k]: v } }));
+  const updStreak = (k, v) => setCfg((c) => ({ ...c, streak_config: { ...c.streak_config, [k]: v } }));
+  const updLb = (k, v) => setCfg((c) => ({ ...c, leaderboard_config: { ...c.leaderboard_config, [k]: v } }));
   const csv = (v) => String(v).split(",").map((x) => parseFloat(x.trim())).filter((x) => !isNaN(x));
 
   return (
@@ -171,6 +174,46 @@ export default function Admin() {
                   <Field label="Targets (CSV)" type="text" value={(cfg.room_config.room_targets || []).join(",")}
                     onChange={(v) => updRoom("room_targets", String(v).split(",").map((x) => parseFloat(x.trim())).filter((x) => !isNaN(x)))} />
                 </div>
+              </div>
+
+              <div className="rounded-2xl pz-glass p-6">
+                <h3 className="font-display font-bold text-lg mb-4">Bots (Auto-fill & Practice)</h3>
+                <div className="flex flex-wrap items-center gap-6 mb-4">
+                  <ToggleRow label="Bots Enabled" checked={cfg.bot_config?.enabled} onChange={(v) => updBot("enabled", v)} testid="toggle-bots" />
+                  <ToggleRow label="Fill 1v1" checked={cfg.bot_config?.fill_1v1} onChange={(v) => updBot("fill_1v1", v)} />
+                  <ToggleRow label="Fill Multiplayer" checked={cfg.bot_config?.fill_multiplayer} onChange={(v) => updBot("fill_multiplayer", v)} />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <Field label="Join Delay (s)" value={cfg.bot_config?.join_delay_seconds} onChange={(v) => updBot("join_delay_seconds", v)} />
+                  <Field label="Error Range (s)" value={cfg.bot_config?.error_range} onChange={(v) => updBot("error_range", v)} />
+                </div>
+                <p className="text-xs text-white/40 mt-3">Lower error range = tougher bots. Bots only join rooms that already have a real player, so duels start within seconds.</p>
+              </div>
+
+              <div className="rounded-2xl pz-glass p-6">
+                <h3 className="font-display font-bold text-lg mb-4">Daily Login Streak</h3>
+                <div className="flex flex-wrap items-center gap-6">
+                  <ToggleRow label="Streak Enabled" checked={cfg.streak_config?.enabled} onChange={(v) => updStreak("enabled", v)} testid="toggle-streak" />
+                  <div className="w-40"><Field label="Daily Bonus (coins)" value={cfg.streak_config?.daily_bonus} onChange={(v) => updStreak("daily_bonus", v)} /></div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl pz-glass p-6">
+                <h3 className="font-display font-bold text-lg mb-4">Leaderboard (Promotional)</h3>
+                <div className="flex flex-wrap items-center gap-6 mb-4">
+                  <ToggleRow label="Enabled" checked={cfg.leaderboard_config?.enabled} onChange={(v) => updLb("enabled", v)} testid="toggle-leaderboard" />
+                  <ToggleRow label="Auto-change Daily" checked={cfg.leaderboard_config?.auto_generate} onChange={(v) => updLb("auto_generate", v)} />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <Field label="Fake Count" value={cfg.leaderboard_config?.fake_count} onChange={(v) => updLb("fake_count", v)} />
+                  <Field label="Min Win" value={cfg.leaderboard_config?.min_win} onChange={(v) => updLb("min_win", v)} />
+                  <Field label="Max Win" value={cfg.leaderboard_config?.max_win} onChange={(v) => updLb("max_win", v)} />
+                  <div className="col-span-2 md:col-span-3">
+                    <Field label="Name Pool (comma separated)" type="text" value={(cfg.leaderboard_config?.name_pool || []).join(", ")}
+                      onChange={(v) => updLb("name_pool", String(v).split(",").map((x) => x.trim()).filter(Boolean))} />
+                  </div>
+                </div>
+                <p className="text-xs text-white/40 mt-3">Promotional winners auto-shuffle every day and blend with real weekly winners.</p>
               </div>
 
               <button onClick={saveConfig} disabled={saving} data-testid="save-config-btn"

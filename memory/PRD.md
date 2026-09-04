@@ -47,3 +47,10 @@ PAZER: a skill-based stopwatch timing game platform. Players stop a stopwatch as
 - **Auto-generated promotional win ticker** near footer (rotates every 5s).
 - Admin config updated: `fixed_config` (min_bet/max_bet/win_multiplier/targets), `room_1v1_config`, `room_config`.
 - Verified: iteration_2 24/24 backend pass, 100% frontend flows. DB reset to new schema; admin re-seeded via mobile.
+
+## Iteration 3 — Bots, Daily Streak & Leaderboard (2026-06)
+- **Practice Bots (admin-controlled)**: auto-fill rooms that already have a real player so 1v1 duels & multiplayer start within seconds. Bots auto-submit a stop near the target (difficulty = `error_range`). Admin config `bot_config`: enabled / fill_1v1 / fill_multiplayer / join_delay_seconds / error_range. Bots have no wallet/stats; skipped in payouts.
+- **Daily Login Streak**: `/api/streak` + `/api/streak/claim` award a daily bonus (default 5 coins to bonus wallet) and track a streak counter (resets if a day is missed). DailyReward card on Home with claim button + flame counter. Admin config `streak_config`.
+- **Weekly Leaderboard**: `/api/leaderboard/weekly` blends real 7-day winners with auto-generated promotional entries that reshuffle daily (seeded by date). New /leaderboard page (podium + list) added as 5th bottom-nav tab "Ranks". Admin config `leaderboard_config` (enabled/auto_generate/fake_count/min_win/max_win/name_pool/manual_entries).
+- get_config now MERGES new config keys without wiping admin customisations.
+- Verified: iteration_3 32/32 backend tests pass, 100% frontend flows, zero issues.

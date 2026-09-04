@@ -60,6 +60,7 @@ export default function RoomGame() {
     }
   };
 
+  const backTo = room?.mode === "1v1" ? "/1v1" : "/multiplayer";
   if (!room) return <div className="flex justify-center py-32"><Loader2 className="h-8 w-8 animate-spin text-pazer-red" /></div>;
 
   const me = room.players?.find((p) => p.user_id === user.id);
@@ -68,18 +69,18 @@ export default function RoomGame() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 md:px-8 py-8">
-      <button onClick={() => nav("/rooms")} className="flex items-center gap-2 text-white/50 hover:text-white text-sm mb-6 transition-colors">
+      <button onClick={() => nav(backTo)} className="flex items-center gap-2 text-white/50 hover:text-white text-sm mb-6 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Back to rooms
       </button>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="font-mono-pz font-extrabold text-4xl text-pazer-red pz-glow">{room.target}s Room</div>
+          <div className="font-mono-pz font-extrabold text-4xl text-pazer-red pz-glow">{room.target}s {room.mode === "1v1" ? "Duel" : "Room"}</div>
           <div className="text-white/40 text-sm">{room.room_code} · {room.status}</div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-white/40 uppercase tracking-wider">Prize Pool</div>
-          <div className="font-mono-pz font-bold text-2xl text-green-400">{room.prize_pool}</div>
+          <div className="text-xs text-white/40 uppercase tracking-wider">{room.mode === "1v1" ? "Winner Gets" : "Prize Pool"}</div>
+          <div className="font-mono-pz font-bold text-2xl text-green-400">{room.mode === "1v1" ? Math.round(room.entry_fee * (room.win_multiplier || 1.5)) : room.prize_pool}</div>
         </div>
       </div>
 

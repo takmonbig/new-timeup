@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 2 (TIMEUP mobile-auth rebrand) — full backend pytest rewrite (mobile auth + bet-based fixed game + 1v1/multiplayer rooms). 24/24 backend tests PASS via public REACT_APP_BACKEND_URL. Frontend Playwright E2E: register with mobile → password eye toggle works (password↔text) → splash screen appears → auto-redirect to /home → header balance pill renders → bottom nav (home/1v1/multiplayer/profile) navigates → win-ticker present → 1v1 tab shows 'Winner gets 75' → profile shows TU-prefixed username → admin mobile-login (9999999999/Admin@123) routes to /admin → Game Config Save shows 'Configuration saved' (no crash despite removed fixed_challenges) → Users tab loads → user rows show TU-prefixed users. All key data-testids present and functional.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin > Users", "issues": ["Search placeholder still reads 'Search username or email' but auth is now mobile-only; consider 'Search username or mobile'."]},
+      {"screen": "Public pages", "issues": ["/api/auth/me still called without token producing benign 401 console noise (carried over from iter 1)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Update Admin user-search placeholder to reference mobile instead of email.",
+    "OPTIONAL: Suppress /api/auth/me call when no localStorage token to remove 401 console noise."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 1112 lines — still monolithic; recommend splitting into routers (auth, wallet, games, rooms, admin, config).",
+    "Fixed game win rule now round(recorded,2)==round(target,2) — verified correct via anti-cheat waiting test and off-by-0.1 loss test.",
+    "1v1 payout math: entry 50 * 1.5 = 75 verified in config and card copy; live payout not exercised (30-min join window, per instructions).",
+    "get_config auto-resets when schema old — good backward compat but silent data loss risk if admin had customized old schema; log the reset.",
+    "CORS_ORIGINS now set to explicit prod origin (good, matches playbook)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "100% of tested flows"},
+  "test_credentials": "Admin mobile 9999999999 / Admin@123 works. Test users registered dynamically with random 10-digit mobiles.",
+  "seed_data_creation": "Multiple TU-prefixed users created via /api/auth/register during pytest and Playwright runs (visible in Admin Users tab). Existing 16 auto-created rooms (10 1v1 + 6 multiplayer) verified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend test file /app/backend/tests/backend_test.py has 24 pytest cases covering mobile auth (register/duplicate/login/bad-pwd/invalid-mobile/admin RBAC), public config shape (fixed_config min_bet=20 win_mult=5, room_1v1_config win_mult=1.5), wallet deposit+bonus+txn ledger, fixed game bet-below-min/win@target5/loss>0.05/replay409/concurrent409, rooms 1v1 shape+join+double-join, multiplayer shape, admin config get/update+save-without-fixed_challenges+users+kyc+withdraw approve+reject-refund+suspend+reactivate+stats. To retest fixed-game win: MUST wait ~target seconds after /start before /stop (anti-cheat LATENCY_BOUND=2.5s) AND send elapsed rounded to target.",
+  "rca of the issue": "No defects found in iteration 2 refactor. All previously-flagged 400 during fixed-challenge start in first Playwright run was expected (test user had 0 balance; not a bug)."
+}

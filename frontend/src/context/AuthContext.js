@@ -27,8 +27,8 @@ export function AuthProvider({ children }) {
     fetchMe();
   }, [fetchMe]);
 
-  const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const login = async (mobile, password) => {
+    const { data } = await api.post("/auth/login", { mobile, password });
     if (data.token) localStorage.setItem("pazer_token", data.token);
     setUser(data.user);
     return data.user;

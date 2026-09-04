@@ -75,9 +75,9 @@ export default function Admin() {
 
   const updWallet = (k, v) => setCfg((c) => ({ ...c, wallet: { ...c.wallet, [k]: v } }));
   const updRoom = (k, v) => setCfg((c) => ({ ...c, room_config: { ...c.room_config, [k]: v } }));
-  const updChallenge = (i, k, v) => setCfg((c) => {
-    const fc = [...c.fixed_challenges]; fc[i] = { ...fc[i], [k]: v }; return { ...c, fixed_challenges: fc };
-  });
+  const updFixed = (k, v) => setCfg((c) => ({ ...c, fixed_config: { ...c.fixed_config, [k]: v } }));
+  const updV1 = (k, v) => setCfg((c) => ({ ...c, room_1v1_config: { ...c.room_1v1_config, [k]: v } }));
+  const csv = (v) => String(v).split(",").map((x) => parseFloat(x.trim())).filter((x) => !isNaN(x));
 
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-8 py-8">
@@ -133,23 +133,28 @@ export default function Admin() {
               </div>
 
               <div className="rounded-2xl pz-glass p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-display font-bold text-lg">Fixed Challenges</h3>
-                  <button onClick={() => setCfg({ ...cfg, fixed_challenges: [...cfg.fixed_challenges, { target: 10, entry_fee: 100, prize: 500, tolerance: 0.05, enabled: true }] })}
-                    className="flex items-center gap-1 text-sm text-pazer-red hover:underline"><Plus className="h-4 w-4" />Add</button>
+                <h3 className="font-display font-bold text-lg mb-4">Fixed Challenge (Home)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Field label="Min Bet" value={cfg.fixed_config.min_bet} onChange={(v) => updFixed("min_bet", v)} />
+                  <Field label="Max Bet" value={cfg.fixed_config.max_bet} onChange={(v) => updFixed("max_bet", v)} />
+                  <Field label="Win Multiplier" value={cfg.fixed_config.win_multiplier} onChange={(v) => updFixed("win_multiplier", v)} />
+                  <div className="flex items-end"><ToggleRow label="Enabled" checked={cfg.fixed_config.enabled} onChange={(v) => updFixed("enabled", v)} /></div>
+                  <div className="col-span-2 md:col-span-4">
+                    <Field label="Target Times (CSV seconds)" type="text" value={(cfg.fixed_config.targets || []).join(",")} onChange={(v) => updFixed("targets", csv(v))} />
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  {cfg.fixed_challenges.map((c, i) => (
-                    <div key={i} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end bg-black/30 rounded-xl p-3">
-                      <Field label="Target(s)" value={c.target} onChange={(v) => updChallenge(i, "target", v)} />
-                      <Field label="Entry" value={c.entry_fee} onChange={(v) => updChallenge(i, "entry_fee", v)} />
-                      <Field label="Prize" value={c.prize} onChange={(v) => updChallenge(i, "prize", v)} />
-                      <Field label="Tolerance" value={c.tolerance} onChange={(v) => updChallenge(i, "tolerance", v)} />
-                      <ToggleRow label="Enabled" checked={c.enabled} onChange={(v) => updChallenge(i, "enabled", v)} />
-                      <button onClick={() => setCfg({ ...cfg, fixed_challenges: cfg.fixed_challenges.filter((_, j) => j !== i) })}
-                        className="h-9 w-9 rounded-lg bg-pazer-red/10 text-pazer-red flex items-center justify-center hover:bg-pazer-red/20 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  ))}
+              </div>
+
+              <div className="rounded-2xl pz-glass p-6">
+                <h3 className="font-display font-bold text-lg mb-4">1v1 Duel Settings</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Field label="Entry Fee" value={cfg.room_1v1_config.entry_fee} onChange={(v) => updV1("entry_fee", v)} />
+                  <Field label="Win Multiplier" value={cfg.room_1v1_config.win_multiplier} onChange={(v) => updV1("win_multiplier", v)} />
+                  <Field label="Duration (min)" value={cfg.room_1v1_config.room_duration_minutes} onChange={(v) => updV1("room_duration_minutes", v)} />
+                  <div className="flex items-end"><ToggleRow label="Enabled" checked={cfg.room_1v1_config.enabled} onChange={(v) => updV1("enabled", v)} /></div>
+                  <div className="col-span-2 md:col-span-4">
+                    <Field label="Target Times (CSV seconds)" type="text" value={(cfg.room_1v1_config.targets || []).join(",")} onChange={(v) => updV1("targets", csv(v))} />
+                  </div>
                 </div>
               </div>
 
@@ -179,7 +184,7 @@ export default function Admin() {
         {/* USERS */}
         <TabsContent value="users" className="mt-6">
           <div className="flex gap-2 mb-4">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search username or email" data-testid="user-search"
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search username or mobile" data-testid="user-search"
               className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
             <button onClick={searchUsers} className="px-5 py-2.5 rounded-lg bg-pazer-red hover:bg-pazer-redhover font-bold text-sm transition-colors">Search</button>
           </div>

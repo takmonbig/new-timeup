@@ -3,16 +3,17 @@ import { LifeBuoy, ChevronDown } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const FAQS = [
-  ["How does the Fixed-Time Challenge work?", "Pick a target time (e.g. 10s), pay the entry fee, then stop the stopwatch as close to the target as possible. If your result falls within the accuracy window, you win the prize."],
-  ["How is the room winner decided?", "The player whose stop time is closest to the target (smallest absolute difference) wins. If two players tie exactly, the earliest valid recorded stop wins."],
+  ["How does the Fixed Challenge work?", "Choose your bet (minimum 20 coins) and a target time, then stop the stopwatch EXACTLY at the target. Hit it precisely and you win 5× your bet."],
+  ["How is the 1v1 / room winner decided?", "The player whose stop time is closest to the target (smallest absolute difference) wins. If two players tie exactly, the earliest valid recorded stop wins. 1v1 pays the winner 1.5×; rooms pay from the prize pool."],
   ["What happens if a room doesn't fill up?", "If the minimum number of players isn't reached by the joining deadline, the room is automatically cancelled and every entry fee is fully refunded to your wallet."],
-  ["What are PAZER Coins?", "PAZER Coins are the virtual currency of the platform. 1 Coin = ₹1. Deposits convert to coins and may include a promotional bonus."],
-  ["Is this gambling?", "PAZER is a skill-based timing game — your reaction and timing precision determine the outcome, not chance. Play responsibly, 18+."],
+  ["What are TIMEUP Coins?", "TIMEUP Coins are the virtual currency of the platform. 1 Coin = ₹1. Deposits convert to coins and may include a promotional bonus."],
+  ["Is this gambling?", "TIMEUP is a skill-based timing game — your reaction and timing precision determine the outcome, not chance. Play responsibly, 18+."],
   ["How do withdrawals work?", "Withdrawals require completed KYC verification and are reviewed by our team before processing. Minimum and maximum limits apply."],
 ];
 
 const RULES = [
-  "Smallest absolute difference from the target wins.",
+  "Fixed Challenge: stop EXACTLY at the target time to win 5× your bet.",
+  "1v1 & Rooms: closest absolute difference from the target wins.",
   "On an exact tie, the earliest valid recorded stop timestamp wins.",
   "All results are validated server-side. Manipulated timers are rejected.",
   "One active session per player at a time.",
@@ -53,9 +54,9 @@ export default function Support() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl pz-glass p-6">
         <h2 className="font-display font-bold text-xl mb-3">Responsible Gaming</h2>
         <p className="text-white/60 text-sm leading-relaxed">
-          PAZER involves paid entries and virtual rewards. Play within your limits and take breaks. Real-money features
+          TIMEUP involves paid entries and virtual rewards. Play within your limits and take breaks. Real-money features
           are enabled only after compliance approval and completed KYC. This platform is intended for players aged 18+.
-          If gaming stops being fun, please step away. Contact support@pazer.com for help or self-exclusion requests.
+          If gaming stops being fun, please step away. Contact support@timeup.com for help or self-exclusion requests.
         </p>
       </motion.div>
     </div>

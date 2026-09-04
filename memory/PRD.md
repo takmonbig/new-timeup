@@ -31,5 +31,19 @@ PAZER: a skill-based stopwatch timing game platform. Players stop a stopwatch as
 - P2: Referrals, promotions/campaigns scheduling, notifications, analytics dashboards, advanced fraud/device fingerprinting, self-exclusion limits, legal T&C/Privacy content by counsel.
 
 ## Credentials
-- Admin: admin@pazer.com / Admin@123
-- Users: register via UI/API.
+- Admin (mobile login): `9999999999` / `Admin@123`
+- Users: register via UI/API with Full name + Mobile + Password.
+
+## Iteration 2 — TIMEUP Rebrand & Game Overhaul (2026-06)
+- Rebranded PAZER → **TIMEUP** (logo in header, splash, auth, landing, footer).
+- **Mobile-number auth**: Signup = Full name + Mobile + Password; Login = Mobile + Password; password eye toggle. Random username auto-generated (TU-prefixed).
+- **Animated stopwatch splash** after login/signup → lands on game Home.
+- Wallet balance moved to **header pill** (live-refreshes on game/deposit/join); no dashboard.
+- **Bottom navigation**: Home · 1v1 · Multiplayer · Profile (mobile-first).
+- **Home = Fixed Challenge** with user-chosen bet (min 20) + target; WIN = stop EXACTLY at target (2-decimal match) → 5× payout.
+- **NEW 1v1 mode**: 2-player rooms, 50 coins, ~10 rooms (5–30s), closest wins 1.5× (75).
+- **Multiplayer**: existing many-player pool rooms.
+- **Profile**: username, win/loss ratio bars, wallet balance, games played/won/lost, prizes, bonus, motivational banner.
+- **Auto-generated promotional win ticker** near footer (rotates every 5s).
+- Admin config updated: `fixed_config` (min_bet/max_bet/win_multiplier/targets), `room_1v1_config`, `room_config`.
+- Verified: iteration_2 24/24 backend pass, 100% frontend flows. DB reset to new schema; admin re-seeded via mobile.

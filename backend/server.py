@@ -56,17 +56,13 @@ DEFAULT_CONFIG = {
         "min_withdrawal": 200,
         "max_withdrawal": 50000,
     },
-    "fixed_challenges": [
-        {"target": 5, "entry_fee": 100, "prize": 500, "tolerance": 0.05, "enabled": True},
-        {"target": 7, "entry_fee": 100, "prize": 500, "tolerance": 0.05, "enabled": True},
-        {"target": 10, "entry_fee": 100, "prize": 500, "tolerance": 0.05, "enabled": True},
-        {"target": 14, "entry_fee": 100, "prize": 500, "tolerance": 0.06, "enabled": True},
-        {"target": 16, "entry_fee": 100, "prize": 500, "tolerance": 0.06, "enabled": True},
-        {"target": 21, "entry_fee": 100, "prize": 500, "tolerance": 0.07, "enabled": True},
-        {"target": 26, "entry_fee": 100, "prize": 500, "tolerance": 0.08, "enabled": True},
-        {"target": 31, "entry_fee": 100, "prize": 500, "tolerance": 0.08, "enabled": True},
-    ],
-    "fixed_promo_multiplier": 1.0,
+    "fixed_config": {
+        "enabled": True,
+        "min_bet": 20,
+        "max_bet": 5000,
+        "win_multiplier": 5,
+        "targets": [5, 7, 10, 14, 16, 21, 26, 31],
+    },
     "room_config": {
         "entry_fee": 50,
         "min_players": 5,
@@ -78,12 +74,20 @@ DEFAULT_CONFIG = {
         "auto_room_count": 6,
         "room_targets": [5, 10, 15, 20, 25, 30],
     },
+    "room_1v1_config": {
+        "enabled": True,
+        "entry_fee": 50,
+        "win_multiplier": 1.5,
+        "room_duration_minutes": 30,
+        "targets": [5, 8, 10, 13, 15, 18, 20, 23, 25, 30],
+    },
 }
 
 
 async def get_config() -> dict:
     cfg = await db.config.find_one({"id": "global"}, {"_id": 0})
-    if not cfg:
+    if not cfg or "fixed_config" not in cfg or "room_1v1_config" not in cfg:
+        await db.config.delete_many({"id": "global"})
         await db.config.insert_one(dict(DEFAULT_CONFIG))
         cfg = dict(DEFAULT_CONFIG)
     return cfg
@@ -234,20 +238,18 @@ async def credit_wallet(user_id: str, amount: float, ttype: str, wallet: str = "
 # Pydantic request models
 # ---------------------------------------------------------------------------
 class RegisterReq(BaseModel):
-    username: str
-    email: EmailStr
+    full_name: str
+    mobile: str
     password: str
-    display_name: Optional[str] = None
-    mobile: Optional[str] = None
 
 
 class LoginReq(BaseModel):
-    email: EmailStr
+    mobile: str
     password: str
 
 
 class ForgotReq(BaseModel):
-    email: EmailStr
+    mobile: str
 
 
 class ResetReq(BaseModel):
@@ -274,6 +276,7 @@ class KycReq(BaseModel):
 
 class FixedStartReq(BaseModel):
     target: float
+    bet: float
 
 
 class FixedStopReq(BaseModel):
@@ -317,17 +320,18 @@ manager = ConnectionManager()
 # ---------------------------------------------------------------------------
 @api.post("/auth/register")
 async def register(body: RegisterReq, response: Response):
-    email = body.email.lower()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="Email already registered")
-    if await db.users.find_one({"username": body.username}):
-        raise HTTPException(status_code=400, detail="Username already taken")
+    mobile = body.mobile.strip()
+    if not mobile.isdigit() or len(mobile) < 10:
+        raise HTTPException(status_code=400, detail="Enter a valid mobile number")
+    if await db.users.find_one({"mobile": mobile}):
+        raise HTTPException(status_code=400, detail="Mobile number already registered")
+    username = "TU" + secrets.token_hex(4).upper()
     doc = {
-        "username": body.username,
-        "email": email,
+        "username": username,
+        "mobile": mobile,
         "password_hash": hash_password(body.password),
-        "display_name": body.display_name or body.username,
-        "mobile": body.mobile,
+        "display_name": body.full_name.strip(),
+        "full_name": body.full_name.strip(),
         "role": "user",
         "status": "active",
         "kyc_status": "not_submitted",
@@ -339,7 +343,7 @@ async def register(body: RegisterReq, response: Response):
     }
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
-    access, refresh = create_access_token(uid, email), create_refresh_token(uid)
+    access, refresh = create_access_token(uid, mobile), create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
     user = await db.users.find_one({"_id": res.inserted_id})
     return {"user": serialize_user(user), "token": access}
@@ -347,25 +351,25 @@ async def register(body: RegisterReq, response: Response):
 
 @api.post("/auth/login")
 async def login(body: LoginReq, request: Request, response: Response):
-    email = body.email.lower()
+    mobile = body.mobile.strip()
     ip = request.client.host if request.client else "unknown"
-    ident = f"{ip}:{email}"
+    ident = f"{ip}:{mobile}"
     attempt = await db.login_attempts.find_one({"identifier": ident})
     if attempt and attempt.get("locked_until"):
         locked = datetime.fromisoformat(attempt["locked_until"])
         if locked > datetime.now(timezone.utc):
             raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
-    user = await db.users.find_one({"email": email})
+    user = await db.users.find_one({"mobile": mobile})
     if not user or not verify_password(body.password, user["password_hash"]):
         count = (attempt["count"] if attempt else 0) + 1
         upd = {"identifier": ident, "count": count}
         if count >= 5:
             upd["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
         await db.login_attempts.update_one({"identifier": ident}, {"$set": upd}, upsert=True)
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid mobile or password")
     await db.login_attempts.delete_one({"identifier": ident})
     uid = str(user["_id"])
-    access, refresh = create_access_token(uid, email), create_refresh_token(uid)
+    access, refresh = create_access_token(uid, mobile), create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
     return {"user": serialize_user(user), "token": access}
 
@@ -392,7 +396,7 @@ async def refresh_token(request: Request, response: Response):
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token")
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        access = create_access_token(str(user["_id"]), user["email"])
+        access = create_access_token(str(user["_id"]), user.get("mobile", ""))
         response.set_cookie("access_token", access, httponly=True, secure=True,
                             samesite="none", max_age=43200, path="/")
         return {"token": access}
@@ -402,7 +406,7 @@ async def refresh_token(request: Request, response: Response):
 
 @api.post("/auth/forgot-password")
 async def forgot_password(body: ForgotReq):
-    user = await db.users.find_one({"email": body.email.lower()})
+    user = await db.users.find_one({"mobile": body.mobile.strip()})
     if user:
         token = secrets.token_urlsafe(32)
         await db.password_reset_tokens.insert_one({
@@ -410,8 +414,8 @@ async def forgot_password(body: ForgotReq):
             "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)),
             "used": False,
         })
-        logger.info(f"[PASSWORD RESET] link token for {body.email}: {token}")
-    return {"message": "If the email exists, a reset link has been sent."}
+        logger.info(f"[PASSWORD RESET] token for {body.mobile}: {token}")
+    return {"message": "If the mobile exists, a reset code has been sent."}
 
 
 @api.post("/auth/reset-password")
@@ -531,51 +535,51 @@ async def public_config():
         "game_enabled": cfg["game_enabled"],
         "real_money_enabled": cfg["real_money_enabled"],
         "wallet": cfg["wallet"],
-        "fixed_challenges": [c for c in cfg["fixed_challenges"] if c.get("enabled")],
-        "fixed_promo_multiplier": cfg["fixed_promo_multiplier"],
+        "fixed_config": cfg["fixed_config"],
         "room_config": cfg["room_config"],
+        "room_1v1_config": cfg["room_1v1_config"],
     }
 
 
 @api.post("/games/fixed/start")
 async def fixed_start(body: FixedStartReq, user: dict = Depends(get_current_user)):
     cfg = await get_config()
-    if not cfg["game_enabled"]:
-        raise HTTPException(status_code=403, detail="Games are currently disabled")
-    challenge = next((c for c in cfg["fixed_challenges"]
-                      if c["target"] == body.target and c.get("enabled")), None)
-    if not challenge:
-        raise HTTPException(status_code=404, detail="Challenge not available")
+    if not cfg["game_enabled"] or not cfg["fixed_config"].get("enabled"):
+        raise HTTPException(status_code=403, detail="Challenge is currently disabled")
+    fc = cfg["fixed_config"]
+    if body.target not in fc["targets"]:
+        raise HTTPException(status_code=404, detail="Target time not available")
+    bet = round(float(body.bet), 2)
+    if bet < fc["min_bet"]:
+        raise HTTPException(status_code=400, detail=f"Minimum bet is {fc['min_bet']} coins")
+    if bet > fc["max_bet"]:
+        raise HTTPException(status_code=400, detail=f"Maximum bet is {fc['max_bet']} coins")
     u = await get_user_by_id(str(user["_id"]))
-    if u.get("main_balance", 0) + u.get("bonus_balance", 0) < challenge["entry_fee"]:
-        raise HTTPException(status_code=400, detail="Insufficient balance for entry fee")
-    # anti-cheat: block concurrent active session
+    if u.get("main_balance", 0) + u.get("bonus_balance", 0) < bet:
+        raise HTTPException(status_code=400, detail="Insufficient balance for this bet")
     active = await db.game_sessions.find_one({"user_id": str(user["_id"]), "status": "active"})
     if active:
         raise HTTPException(status_code=409, detail="You already have an active game session")
     nonce = secrets.token_urlsafe(16)
-    await debit_wallet(u, challenge["entry_fee"], "game_entry",
-                       meta={"mode": "fixed", "target": challenge["target"]})
+    prize = round(bet * fc["win_multiplier"], 2)
+    await debit_wallet(u, bet, "game_entry", meta={"mode": "fixed", "target": body.target})
     session = {
         "id": str(uuid.uuid4()),
         "user_id": str(user["_id"]),
         "mode": "fixed",
-        "target": challenge["target"],
-        "entry_fee": challenge["entry_fee"],
-        "prize": challenge["prize"],
-        "tolerance": challenge["tolerance"],
-        "promo_multiplier": cfg["fixed_promo_multiplier"],
+        "target": body.target,
+        "entry_fee": bet,
+        "prize": prize,
+        "win_multiplier": fc["win_multiplier"],
         "nonce": nonce,
         "status": "active",
         "server_start": datetime.now(timezone.utc).timestamp(),
         "created_at": now_iso(),
     }
     await db.game_sessions.insert_one(dict(session))
-    # update entry stat
-    await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": challenge["entry_fee"]}})
-    return {"session_id": session["id"], "nonce": nonce, "target": challenge["target"],
-            "entry_fee": challenge["entry_fee"], "prize": challenge["prize"],
-            "tolerance": challenge["tolerance"]}
+    await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": bet}})
+    return {"session_id": session["id"], "nonce": nonce, "target": body.target,
+            "entry_fee": bet, "prize": prize}
 
 
 @api.post("/games/fixed/stop")
@@ -595,8 +599,9 @@ async def fixed_stop(body: FixedStopReq, user: dict = Depends(get_current_user))
     flagged = abs(server_elapsed - body.elapsed) > LATENCY_BOUND
     recorded = round(body.elapsed, 3)
     diff = round(abs(recorded - session["target"]), 3)
-    won = diff <= session["tolerance"] and not flagged
-    prize = round(session["prize"] * session.get("promo_multiplier", 1.0), 2) if won else 0.0
+    # WIN: must stop exactly at the target time (matches at 2-decimal display)
+    won = round(recorded, 2) == round(session["target"], 2) and not flagged
+    prize = session["prize"] if won else 0.0
 
     await db.game_sessions.update_one({"id": session["id"]}, {"$set": {
         "status": "completed", "recorded": recorded, "diff": diff,
@@ -672,21 +677,36 @@ def room_public(room: dict) -> dict:
     return r
 
 
-async def create_room(target: float, cfg: dict) -> dict:
-    rc = cfg["room_config"]
+async def create_room(target: float, cfg: dict, mode: str = "multiplayer") -> dict:
+    if mode == "1v1":
+        rc = cfg["room_1v1_config"]
+        entry_fee = rc["entry_fee"]
+        min_players, max_players = 2, 2
+        win_multiplier = rc["win_multiplier"]
+        duration = rc["room_duration_minutes"]
+        platform_fee_percent, num_winners = 0, 1
+    else:
+        rc = cfg["room_config"]
+        entry_fee = rc["entry_fee"]
+        min_players, max_players = rc["min_players"], rc["max_players"]
+        win_multiplier = None
+        duration = rc["room_duration_minutes"]
+        platform_fee_percent, num_winners = rc["platform_fee_percent"], rc["num_winners"]
     room = {
         "id": str(uuid.uuid4()),
-        "room_code": "RM" + uuid.uuid4().hex[:6].upper(),
+        "room_code": ("V1" if mode == "1v1" else "RM") + uuid.uuid4().hex[:6].upper(),
+        "mode": mode,
         "target": target,
-        "entry_fee": rc["entry_fee"],
-        "min_players": rc["min_players"],
-        "max_players": rc["max_players"],
-        "platform_fee_percent": rc["platform_fee_percent"],
-        "num_winners": rc["num_winners"],
+        "entry_fee": entry_fee,
+        "min_players": min_players,
+        "max_players": max_players,
+        "win_multiplier": win_multiplier,
+        "platform_fee_percent": platform_fee_percent,
+        "num_winners": num_winners,
         "runner_up_percent": rc.get("runner_up_percent", 0),
         "status": "OPEN",
         "participants": [],
-        "join_deadline": (datetime.now(timezone.utc) + timedelta(minutes=rc["room_duration_minutes"])).isoformat(),
+        "join_deadline": (datetime.now(timezone.utc) + timedelta(minutes=duration)).isoformat(),
         "live_deadline": None,
         "winner": None,
         "created_at": now_iso(),
@@ -696,8 +716,8 @@ async def create_room(target: float, cfg: dict) -> dict:
 
 
 @api.get("/rooms")
-async def list_rooms(status: Optional[str] = None):
-    q = {}
+async def list_rooms(status: Optional[str] = None, mode: str = "multiplayer"):
+    q = {"mode": mode}
     if status:
         q["status"] = status.upper()
     else:
@@ -707,8 +727,8 @@ async def list_rooms(status: Optional[str] = None):
 
 
 @api.get("/rooms/completed")
-async def completed_rooms():
-    rooms = await db.rooms.find({"status": {"$in": ["COMPLETED", "CANCELLED", "REFUNDED"]}}) \
+async def completed_rooms(mode: str = "multiplayer"):
+    rooms = await db.rooms.find({"mode": mode, "status": {"$in": ["COMPLETED", "CANCELLED", "REFUNDED"]}}) \
         .sort("created_at", -1).to_list(50)
     return [room_public(r) for r in rooms]
 
@@ -789,10 +809,16 @@ async def finalize_room(room: dict):
     # rank: smallest diff, tie -> earliest stop
     submitted.sort(key=lambda p: (p["diff"], p.get("stopped_at", float("inf"))))
     gross = len(participants) * room["entry_fee"]
-    platform_fee = gross * room["platform_fee_percent"] / 100.0
-    prize_pool = gross - platform_fee
-    num_winners = min(room["num_winners"], len(submitted))
-    ranked = []
+    is_1v1 = room.get("mode") == "1v1"
+    if is_1v1:
+        # winner gets a fixed multiplier of their entry (e.g. 1.5x)
+        prize_pool = round(room["entry_fee"] * (room.get("win_multiplier") or 1.5), 2)
+        platform_fee = round(gross - prize_pool, 2)
+        num_winners = 1 if submitted else 0
+    else:
+        platform_fee = gross * room["platform_fee_percent"] / 100.0
+        prize_pool = gross - platform_fee
+        num_winners = min(room["num_winners"], len(submitted))
     for i, p in enumerate(submitted):
         p["rank"] = i + 1
         p["prize"] = 0.0
@@ -891,12 +917,19 @@ async def room_manager_loop():
                 ld = datetime.fromisoformat(room["live_deadline"]) if room.get("live_deadline") else None
                 if ld and now >= ld:
                     await finalize_room(room)
-            # ensure auto rooms exist per target
+            # ensure auto rooms exist per target (multiplayer)
             rc = cfg["room_config"]
             for target in rc["room_targets"]:
-                exists = await db.rooms.find_one({"target": target, "status": {"$in": ["OPEN", "FULL"]}})
+                exists = await db.rooms.find_one({"mode": "multiplayer", "target": target, "status": {"$in": ["OPEN", "FULL"]}})
                 if not exists:
-                    await create_room(target, cfg)
+                    await create_room(target, cfg, "multiplayer")
+            # ensure auto 1v1 rooms exist per target
+            v1 = cfg.get("room_1v1_config", {})
+            if v1.get("enabled", True):
+                for target in v1.get("targets", []):
+                    exists = await db.rooms.find_one({"mode": "1v1", "target": target, "status": {"$in": ["OPEN", "FULL"]}})
+                    if not exists:
+                        await create_room(target, cfg, "1v1")
         except Exception as e:
             logger.error(f"room loop error: {e}")
         await asyncio.sleep(5)
@@ -929,7 +962,8 @@ async def admin_users(admin: dict = Depends(require_admin), search: Optional[str
     q = {}
     if search:
         q = {"$or": [{"username": {"$regex": search, "$options": "i"}},
-                     {"email": {"$regex": search, "$options": "i"}}]}
+                     {"mobile": {"$regex": search, "$options": "i"}},
+                     {"display_name": {"$regex": search, "$options": "i"}}]}
     users = await db.users.find(q).sort("created_at", -1).to_list(500)
     return [serialize_user(u) for u in users]
 
@@ -1022,7 +1056,7 @@ async def admin_audit_logs(admin: dict = Depends(require_admin)):
 
 @api.get("/")
 async def root():
-    return {"message": "PAZER API", "status": "ok"}
+    return {"message": "TIMEUP API", "status": "ok"}
 
 
 app.include_router(api)
@@ -1040,24 +1074,28 @@ app.add_middleware(
 # Startup
 # ---------------------------------------------------------------------------
 async def seed_admin():
-    email = os.environ["ADMIN_EMAIL"].lower()
+    mobile = os.environ.get("ADMIN_MOBILE", "9999999999")
     password = os.environ["ADMIN_PASSWORD"]
-    existing = await db.users.find_one({"email": email})
+    existing = await db.users.find_one({"mobile": mobile})
     if not existing:
         await db.users.insert_one({
-            "username": "admin", "email": email, "password_hash": hash_password(password),
-            "display_name": "PAZER Admin", "role": "admin", "status": "active",
+            "username": "admin", "mobile": mobile, "password_hash": hash_password(password),
+            "display_name": "TIMEUP Admin", "full_name": "TIMEUP Admin", "role": "admin", "status": "active",
             "kyc_status": "verified", "main_balance": 0.0, "bonus_balance": 0.0,
             "stats": {"games_played": 0, "games_won": 0, "total_entries": 0.0, "total_prizes": 0.0},
             "created_at": now_iso(),
         })
     elif not verify_password(password, existing["password_hash"]):
-        await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(password)}})
+        await db.users.update_one({"mobile": mobile}, {"$set": {"password_hash": hash_password(password)}})
 
 
 @app.on_event("startup")
 async def startup():
-    await db.users.create_index("email", unique=True)
+    try:
+        await db.users.drop_index("email_1")
+    except Exception:
+        pass
+    await db.users.create_index("mobile", unique=True, sparse=True)
     await db.users.create_index("username")
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.login_attempts.create_index("identifier")
@@ -1067,7 +1105,7 @@ async def startup():
     await seed_admin()
     await get_config()
     asyncio.create_task(room_manager_loop())
-    logger.info("PAZER API started")
+    logger.info("TIMEUP API started")
 
 
 @app.on_event("shutdown")

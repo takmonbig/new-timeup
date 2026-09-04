@@ -2,12 +2,13 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute, PublicLayout } from "@/components/ProtectedRoute";
-import Home from "@/pages/Home";
+import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
-import Dashboard from "@/pages/Dashboard";
-import PlayFixed from "@/pages/PlayFixed";
-import Rooms from "@/pages/Rooms";
+import Splash from "@/pages/Splash";
+import GameHome from "@/pages/GameHome";
+import OneVsOne from "@/pages/OneVsOne";
+import Multiplayer from "@/pages/Multiplayer";
 import RoomGame from "@/pages/RoomGame";
 import Wallet from "@/pages/Wallet";
 import Profile from "@/pages/Profile";
@@ -21,16 +22,17 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route element={<PublicLayout />}>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Landing />} />
               <Route path="/support" element={<Support />} />
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/splash" element={<Splash />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/play" element={<PlayFixed />} />
-              <Route path="/rooms" element={<Rooms />} />
-              <Route path="/rooms/:id" element={<RoomGame />} />
+              <Route path="/home" element={<GameHome />} />
+              <Route path="/1v1" element={<OneVsOne />} />
+              <Route path="/multiplayer" element={<Multiplayer />} />
+              <Route path="/room/:id" element={<RoomGame />} />
               <Route path="/wallet" element={<Wallet />} />
               <Route path="/profile" element={<Profile />} />
             </Route>

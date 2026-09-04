@@ -45,6 +45,7 @@ export default function Wallet() {
       setModal(null);
       setAmount("");
       load();
+      window.dispatchEvent(new Event("wallet:refresh"));
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     } finally {

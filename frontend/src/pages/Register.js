@@ -1,72 +1,71 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Timer, Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { formatApiError } from "@/lib/api";
+import { LOGO_URL } from "@/lib/brand";
 
 export default function Register() {
   const { register } = useAuth();
   const nav = useNavigate();
-  const [form, setForm] = useState({ username: "", email: "", password: "", display_name: "", mobile: "" });
+  const [form, setForm] = useState({ full_name: "", mobile: "", password: "" });
+  const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const upd = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
   const submit = async (e) => {
     e.preventDefault();
-    setErr("");
-    setBusy(true);
+    setErr(""); setBusy(true);
     try {
       await register(form);
-      toast.success("Account created! Welcome to PAZER.");
-      nav("/dashboard");
+      toast.success("Account created! Welcome to TIMEUP.");
+      nav("/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   return (
     <div className="min-h-screen pz-radial pz-grain flex items-center justify-center px-4 py-12">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 justify-center mb-8">
-          <Timer className="h-8 w-8 text-pazer-red" strokeWidth={2.5} />
-          <span className="font-display font-extrabold text-2xl">PAZER</span>
+        <Link to="/" className="flex justify-center mb-8">
+          <img src={LOGO_URL} alt="TIMEUP" className="h-11 w-auto" style={{ filter: "drop-shadow(0 0 12px rgba(255,42,42,0.4))" }} />
         </Link>
         <div className="pz-glass rounded-2xl p-8">
           <h1 className="font-display font-bold text-2xl mb-1">Create account</h1>
           <p className="text-white/50 text-sm mb-6">Join the timing masters.</p>
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs uppercase tracking-wider text-white/50">Username</label>
-                <input data-testid="register-username" required value={form.username} onChange={upd("username")}
-                  className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 focus:border-pazer-red outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-wider text-white/50">Display name</label>
-                <input data-testid="register-displayname" value={form.display_name} onChange={upd("display_name")}
-                  className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 focus:border-pazer-red outline-none transition-colors" />
+            <div>
+              <label className="text-xs uppercase tracking-wider text-white/50">Full Name</label>
+              <div className="mt-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
+                <User className="h-4 w-4 text-white/40 ml-4" />
+                <input data-testid="register-fullname" required value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  className="w-full bg-transparent px-3 py-3 outline-none" placeholder="Your name" />
               </div>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wider text-white/50">Email</label>
-              <input data-testid="register-email" type="email" required value={form.email} onChange={upd("email")}
-                className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 focus:border-pazer-red outline-none transition-colors" />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wider text-white/50">Mobile (optional)</label>
-              <input data-testid="register-mobile" value={form.mobile} onChange={upd("mobile")}
-                className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 focus:border-pazer-red outline-none transition-colors" />
+              <label className="text-xs uppercase tracking-wider text-white/50">Mobile Number</label>
+              <div className="mt-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
+                <Phone className="h-4 w-4 text-white/40 ml-4" />
+                <input data-testid="register-mobile" type="tel" inputMode="numeric" required value={form.mobile}
+                  onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, "") })}
+                  className="w-full bg-transparent px-3 py-3 outline-none" placeholder="10-digit mobile" />
+              </div>
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-white/50">Password</label>
-              <input data-testid="register-password" type="password" required value={form.password} onChange={upd("password")}
-                className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 focus:border-pazer-red outline-none transition-colors" />
+              <div className="mt-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
+                <input data-testid="register-password" type={show ? "text" : "password"} required value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full bg-transparent px-4 py-3 outline-none" />
+                <button type="button" onClick={() => setShow((s) => !s)} data-testid="toggle-password"
+                  className="px-4 text-white/40 hover:text-white transition-colors">
+                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {err && <p data-testid="register-error" className="text-sm text-pazer-red">{err}</p>}
             <button data-testid="register-submit" disabled={busy}

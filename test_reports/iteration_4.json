@@ -1,0 +1,25 @@
+{
+  "summary": "Re-tested weekly leaderboard after N+1 -> single $lookup aggregation refactor. Added /app/backend/tests/test_leaderboard_refactor.py with 6 focused pytest cases. All 6 PASS + all 8 iter3 regression tests still PASS => 14/14 green. Verified: (1) endpoint returns [{rank,name,coins,is_you}] sorted desc with sequential ranks starting at 1; (2) real winner flow works end-to-end (register -> deposit 500 -> fixed/start target=5 bet=20 -> sleep 5s -> fixed/stop elapsed=5.0 -> won=true, prize=40 -> leaderboard shows caller with is_you=true, coins>0, correct display_name); (3) admin (role=admin) is excluded by the $match user.role != admin — admin calling the endpoint sees is_you=false for every row; (4) promotional entries stable within the same day (two consecutive calls return identical promo names & coins — the today_str-seeded RNG works); (5) admin disabling leaderboard_config.enabled via PUT /api/admin/config removes promos, leaving only real winners with sequential ranks; (6) endpoint responds fast (~100-300ms typical, well under 3s budget) — confirming single-aggregation path (no N+1). No 500s observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_leaderboard_refactor.py",
+    "/app/backend/tests/test_iter3.py",
+    "/app/test_reports/pytest/iter4_leaderboard.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Aggregation correctness looks good: $match on regex 24-hex is a robust guard against non-ObjectId user_ids that would break $toObjectId in $lookup let. Consider persisting user_id as ObjectId in games collection to drop the regex hop entirely.",
+    "$limit 30 pre-lookup is fine since limit is applied AFTER $sort by coins; but note only 30 real winners are considered — for a leaderboard capped at 25 rows this is safe.",
+    "Response mixes real + promo entries then re-sorts and slices to 25. If real winners > 25, some real winners might be dropped in favor of higher-coin promos (unlikely given seed range 500-25000, but a real user with 25k+ prize could still be preserved). Acceptable per current PRD.",
+    "server.py is now ~1281 lines — split recommendation from iter3 stands (routers auth/wallet/games/rooms/admin/streak/leaderboard/bots)."
+  ],
+  "updated_files": ["/app/backend/tests/test_leaderboard_refactor.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "not tested (backend-only re-test)"},
+  "test_credentials": "Admin 9999999999 / Admin@123 verified. Test users registered dynamically with TEST_ prefix.",
+  "seed_data_creation": "Multiple TEST_ users created; one won a fixed game (target=5, bet=20) contributing a real winner row on leaderboard.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Leaderboard aggregation refactor validated. test_leaderboard_refactor.py covers shape/perf, real-winner flow, admin exclusion, promo stability, admin-disable, and streak smoke. To trigger a fixed-game win from tests: bet >= 20 (min_bet), target in fixed_config.targets, sleep(target) then POST /games/fixed/stop with elapsed=float(target); rounding to 2 decimals matches server win check. Full regression = backend_test.py (24) + test_iter3.py (8) + test_leaderboard_refactor.py (6) = 38 tests.",
+  "rca of the issue": "No defects found. Refactor from per-user find() N+1 to single $lookup+$unwind aggregation is functionally equivalent and materially faster."
+}

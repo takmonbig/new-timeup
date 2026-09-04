@@ -745,16 +745,26 @@ async def weekly_leaderboard(user: dict = Depends(get_current_user)):
     agg = await db.games.aggregate([
         {"$match": {"created_at": {"$gte": week_ago}, "prize": {"$gt": 0}}},
         {"$group": {"_id": "$user_id", "coins": {"$sum": "$prize"}}},
+        {"$match": {"_id": {"$regex": "^[0-9a-fA-F]{24}$"}}},
+        {"$lookup": {
+            "from": "users",
+            "let": {"uid": {"$toObjectId": "$_id"}},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": ["$_id", "$$uid"]}}},
+                {"$project": {"display_name": 1, "username": 1, "role": 1}},
+            ],
+            "as": "user",
+        }},
+        {"$unwind": "$user"},
+        {"$match": {"user.role": {"$ne": "admin"}}},
         {"$sort": {"coins": -1}}, {"$limit": 30},
     ]).to_list(30)
-    entries = []
     my_id = str(user["_id"])
-    for a in agg:
-        u = await db.users.find_one({"_id": ObjectId(a["_id"])}) if ObjectId.is_valid(a["_id"]) else None
-        if not u or u.get("role") == "admin":
-            continue
-        entries.append({"name": u.get("display_name") or u.get("username"),
-                        "coins": round(a["coins"], 2), "is_you": a["_id"] == my_id})
+    entries = [{
+        "name": a["user"].get("display_name") or a["user"].get("username"),
+        "coins": round(a["coins"], 2),
+        "is_you": a["_id"] == my_id,
+    } for a in agg]
     # promotional entries (manual + auto-generated, stable per day)
     if lc.get("enabled", True):
         for e in lc.get("manual_entries", []):

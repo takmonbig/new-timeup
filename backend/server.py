@@ -301,9 +301,13 @@ class WithdrawReq(BaseModel):
 
 class KycReq(BaseModel):
     full_name: str
-    document_type: str
-    document_number: str
-    dob: Optional[str] = None
+    method: str  # 'bank' | 'upi'
+    account_number: Optional[str] = None
+    ifsc: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_name: Optional[str] = None
+    upi_id: Optional[str] = None
+    upi_name: Optional[str] = None
 
 
 class FixedStartReq(BaseModel):
@@ -756,7 +760,9 @@ async def weekly_leaderboard(user: dict = Depends(get_current_user)):
             "as": "user",
         }},
         {"$unwind": "$user"},
-        {"$match": {"user.role": {"$ne": "admin"}}},
+        {"$match": {"user.role": {"$ne": "admin"},
+                    "user.display_name": {"$not": {"$regex": "^test", "$options": "i"}},
+                    "user.username": {"$not": {"$regex": "^test", "$options": "i"}}}},
         {"$sort": {"coins": -1}}, {"$limit": 30},
     ]).to_list(30)
     my_id = str(user["_id"])
@@ -848,7 +854,7 @@ async def list_rooms(status: Optional[str] = None, mode: str = "multiplayer"):
 
 @api.get("/rooms/completed")
 async def completed_rooms(mode: str = "multiplayer"):
-    rooms = await db.rooms.find({"mode": mode, "status": {"$in": ["COMPLETED", "CANCELLED", "REFUNDED"]}}) \
+    rooms = await db.rooms.find({"mode": mode, "status": "COMPLETED"}) \
         .sort("created_at", -1).to_list(50)
     return [room_public(r) for r in rooms]
 
@@ -1258,17 +1264,36 @@ async def seed_admin():
 
 @app.on_event("startup")
 async def startup():
+    # index creation must never crash startup (deploy health check safety)
     try:
         await db.users.drop_index("email_1")
     except Exception:
         pass
-    await db.users.create_index("mobile", unique=True, sparse=True)
-    await db.users.create_index("username")
-    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
-    await db.login_attempts.create_index("identifier")
-    await db.transactions.create_index("user_id")
-    await db.games.create_index("user_id")
-    await db.rooms.create_index("status")
+    try:
+        await db.users.drop_index("mobile_1")
+    except Exception:
+        pass
+    try:
+        # partial unique index: only enforce uniqueness on non-empty string mobiles
+        # (avoids duplicate-key crash when legacy records have null/empty mobile)
+        await db.users.create_index(
+            "mobile", unique=True, name="mobile_unique_partial",
+            partialFilterExpression={"mobile": {"$type": "string", "$gt": ""}},
+        )
+    except Exception as e:
+        logger.warning(f"mobile index skipped: {e}")
+    for coll, field, kwargs in [
+        (db.users, "username", {}),
+        (db.password_reset_tokens, "expires_at", {}),
+        (db.login_attempts, "identifier", {}),
+        (db.transactions, "user_id", {}),
+        (db.games, "user_id", {}),
+        (db.rooms, "status", {}),
+    ]:
+        try:
+            await coll.create_index(field, **kwargs)
+        except Exception as e:
+            logger.warning(f"index {field} skipped: {e}")
     await seed_admin()
     await get_config()
     asyncio.create_task(room_manager_loop())

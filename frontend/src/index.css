@@ -131,3 +131,65 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------- Sci-fi animated background ---------------- */
+.pz-scifi {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255, 42, 42, 0.14), transparent 45%),
+    #050505;
+}
+.pz-scifi__grid {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    linear-gradient(rgba(255, 42, 42, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 42, 42, 0.09) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: perspective(500px) rotateX(58deg) translateY(0);
+  transform-origin: 50% 0;
+  animation: pz-grid-move 6s linear infinite;
+  mask-image: radial-gradient(circle at 50% 40%, #000 10%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 50% 40%, #000 10%, transparent 70%);
+}
+@keyframes pz-grid-move {
+  from { background-position: 0 0; }
+  to { background-position: 0 46px; }
+}
+.pz-scifi__orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.4;
+  animation: pz-float 14s ease-in-out infinite;
+}
+.pz-scifi__orb.o1 { width: 280px; height: 280px; background: rgba(255, 42, 42, 0.35); top: 8%; left: -60px; }
+.pz-scifi__orb.o2 { width: 220px; height: 220px; background: rgba(120, 0, 0, 0.5); bottom: 6%; right: -40px; animation-delay: -5s; }
+.pz-scifi__orb.o3 { width: 180px; height: 180px; background: rgba(255, 80, 80, 0.25); top: 45%; left: 55%; animation-delay: -9s; }
+@keyframes pz-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(20px, -30px) scale(1.15); }
+}
+.pz-scifi__scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(255,255,255,0.02) 50%, transparent 50%);
+  background-size: 100% 4px;
+  animation: pz-scan 8s linear infinite;
+  opacity: 0.5;
+}
+@keyframes pz-scan { from { background-position: 0 0; } to { background-position: 0 100px; } }
+
+.pz-content { position: relative; z-index: 2; }
+
+/* center popup */
+@keyframes pz-pop-in {
+  0% { transform: scale(0.7) translateY(10px); opacity: 0; }
+  60% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.pz-pop { animation: pz-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }

@@ -3,6 +3,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { BottomNav } from "@/components/BottomNav";
 import { WinTicker } from "@/components/WinTicker";
+import { SciFiBackground } from "@/components/SciFiBackground";
+import { CenterPopupHost } from "@/components/CenterPopup";
 import { Timer } from "lucide-react";
 
 function Loader() {
@@ -19,21 +21,29 @@ export function ProtectedRoute({ adminOnly }) {
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== "admin") return <Navigate to="/home" replace />;
   return (
-    <div className="min-h-screen pz-radial pz-grain pb-24">
-      <Navbar />
-      <Outlet />
-      {!adminOnly && <><WinTicker /><BottomNav /></>}
+    <div className="min-h-screen pb-24">
+      <SciFiBackground />
+      <CenterPopupHost />
+      <div className="pz-content">
+        <Navbar />
+        <Outlet />
+        {!adminOnly && <><WinTicker /><BottomNav /></>}
+      </div>
     </div>
   );
 }
 
 export function PublicLayout() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) return <Loader />;
   return (
-    <div className="min-h-screen pz-radial pz-grain">
-      <Navbar />
-      <Outlet />
+    <div className="min-h-screen">
+      <SciFiBackground />
+      <CenterPopupHost />
+      <div className="pz-content">
+        <Navbar />
+        <Outlet />
+      </div>
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Target, Loader2, Trophy, XCircle, RotateCcw, Coins } from "lucide-react";
+import { Target, Loader2, Trophy, RotateCcw, Coins, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import Stopwatch from "@/components/Stopwatch";
 import { DailyReward } from "@/components/DailyReward";
+import { Guide } from "@/components/Guide";
+import { showPopup } from "@/components/CenterPopup";
 
 const QUICK_BETS = [20, 50, 100, 200, 500];
 
@@ -17,6 +19,7 @@ export default function GameHome() {
   const [session, setSession] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [lossModal, setLossModal] = useState(false);
   const swRef = useRef(null);
   const elapsedRef = useRef(0);
 
@@ -28,18 +31,31 @@ export default function GameHome() {
     }).catch(() => {});
   }, []);
 
-  const start = async () => {
-    if (bet < (cfg?.min_bet || 20)) return toast.error(`Minimum bet is ${cfg.min_bet} coins`);
+  const startWith = async (useBet, useTarget) => {
+    if (useBet < (cfg?.min_bet || 20)) {
+      showPopup({ type: "warning", title: "Bet too low", message: `Minimum bet is ${cfg.min_bet} coins.` });
+      return;
+    }
     setBusy(true);
     try {
-      const { data } = await api.post("/games/fixed/start", { target, bet });
+      const { data } = await api.post("/games/fixed/start", { target: useTarget, bet: useBet });
       setSession(data);
-      setPhase("countdown"); setCount(3);
+      setResult(null);
+      setLossModal(false);
+      setPhase("countdown");
+      setCount(3);
       window.dispatchEvent(new Event("wallet:refresh"));
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail));
+      const detail = formatApiError(e.response?.data?.detail);
+      if (/insufficient/i.test(detail)) {
+        showPopup({ type: "wallet", title: "Insufficient balance", message: "Add coins to your wallet to keep playing." });
+      } else {
+        showPopup({ type: "warning", title: "Can't start", message: detail });
+      }
     } finally { setBusy(false); }
   };
+
+  const start = () => startWith(bet, target);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -49,7 +65,7 @@ export default function GameHome() {
   }, [phase, count]);
 
   const stop = async () => {
-    if (busy) return;
+    if (busy || phase !== "running") return;
     const elapsed = swRef.current?.stop() ?? elapsedRef.current;
     setBusy(true);
     try {
@@ -57,21 +73,22 @@ export default function GameHome() {
       setResult(data);
       setPhase("result");
       window.dispatchEvent(new Event("wallet:refresh"));
-      if (data.won) toast.success(`Bullseye! You won ${data.prize} coins!`);
-      else toast(data.flagged ? "Result flagged by anti-cheat" : "Not exact — try again!");
+      if (data.won) toast.success(`Bullseye! +${data.prize} coins`);
+      else setTimeout(() => setLossModal(true), 500);
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail));
+      showPopup({ type: "warning", title: "Something went wrong", message: formatApiError(e.response?.data?.detail) });
       setPhase("select");
     } finally { setBusy(false); }
   };
 
-  const reset = () => { swRef.current?.reset(); setSession(null); setResult(null); setPhase("select"); };
-
+  const reset = () => { swRef.current?.reset(); setSession(null); setResult(null); setLossModal(false); setPhase("select"); };
   const potential = Math.round(bet * (cfg?.win_multiplier || 5));
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
+      {phase === "select" && <Guide />}
       {phase === "select" && <DailyReward />}
+
       <div className="flex items-center gap-2 mb-1">
         <Target className="h-5 w-5 text-pazer-red" />
         <h1 className="font-display font-bold text-2xl tracking-tight">Fixed Challenge</h1>
@@ -86,13 +103,11 @@ export default function GameHome() {
               <div className="grid grid-cols-4 gap-2">
                 {cfg.targets.map((t) => (
                   <button key={t} onClick={() => setTarget(t)} data-testid={`target-${t}`}
-                    className={`py-3 rounded-xl font-mono-pz font-bold text-lg transition-colors ${
-                      target === t ? "bg-pazer-red text-white pz-glow-box" : "bg-white/5 text-white/70 hover:bg-white/10"
-                    }`}>{t}<span className="text-xs opacity-60">s</span></button>
+                    className={`py-3 rounded-xl font-mono-pz font-bold text-lg transition-colors ${target === t ? "bg-pazer-red text-white pz-glow-box" : "bg-white/5 text-white/70 hover:bg-white/10"}`}>
+                    {t}<span className="text-xs opacity-60">s</span></button>
                 ))}
               </div>
             </div>
-
             <div>
               <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Your Bet (min {cfg.min_bet})</div>
               <div className="flex items-center bg-black/40 border border-white/10 rounded-xl focus-within:border-pazer-red transition-colors mb-2">
@@ -108,7 +123,6 @@ export default function GameHome() {
                 ))}
               </div>
             </div>
-
             <div className="rounded-2xl pz-glass p-5 flex items-center justify-between">
               <div>
                 <div className="text-xs text-white/40 uppercase tracking-wider">Win Payout</div>
@@ -119,7 +133,6 @@ export default function GameHome() {
                 <div>Target <span className="font-mono-pz text-white">{target}s</span></div>
               </div>
             </div>
-
             <button onClick={start} disabled={busy} data-testid="start-challenge-btn"
               className="w-full py-4 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold text-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               {busy && <Loader2 className="h-5 w-5 animate-spin" />} Pay {bet} & Start
@@ -127,9 +140,10 @@ export default function GameHome() {
           </motion.div>
         )}
 
-        {(phase === "countdown" || phase === "running") && (
-          <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center py-4">
-            <div className="relative">
+        {(phase === "countdown" || phase === "running" || phase === "result") && (
+          <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex flex-col items-center pt-2">
+            <div className="relative flex items-center justify-center">
               <Stopwatch ref={swRef} target={target} running={phase === "running"} onTick={(e) => (elapsedRef.current = e)} />
               {phase === "countdown" && (
                 <motion.div key={count} initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -138,33 +152,57 @@ export default function GameHome() {
                 </motion.div>
               )}
             </div>
-            <motion.button whileTap={{ scale: 0.94 }} onClick={stop} disabled={phase !== "running" || busy}
-              data-testid="stopwatch-stop-button"
-              className="mt-8 h-28 w-28 rounded-full bg-pazer-red font-display font-extrabold text-2xl pz-glow-box disabled:opacity-40 hover:bg-pazer-redhover transition-colors">
-              STOP
-            </motion.button>
-            <p className="text-white/40 text-sm mt-4">Tap STOP exactly at {target}.00</p>
+
+            {phase !== "result" ? (
+              <>
+                <motion.button whileTap={{ scale: 0.92 }} onClick={stop} disabled={phase !== "running" || busy}
+                  data-testid="stopwatch-stop-button"
+                  className="mt-10 h-32 w-32 rounded-full bg-pazer-red font-display font-extrabold text-3xl pz-glow-box disabled:opacity-40 hover:bg-pazer-redhover transition-colors active:scale-95">
+                  STOP
+                </motion.button>
+                <p className="text-white/40 text-sm mt-5">Tap STOP once, exactly at {target}.00</p>
+              </>
+            ) : result && (
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full mt-8 rounded-2xl pz-glass p-6 text-center">
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="bg-black/40 rounded-xl p-3"><div className="text-[10px] text-white/40 uppercase mb-1">You</div><div className="font-mono-pz text-lg font-bold" data-testid="result-time">{result.recorded?.toFixed(2)}</div></div>
+                  <div className="bg-black/40 rounded-xl p-3"><div className="text-[10px] text-white/40 uppercase mb-1">Target</div><div className="font-mono-pz text-lg font-bold">{result.target?.toFixed(2)}</div></div>
+                  <div className="bg-black/40 rounded-xl p-3"><div className="text-[10px] text-white/40 uppercase mb-1">Off by</div><div className="font-mono-pz text-lg font-bold text-pazer-red">{result.diff?.toFixed(2)}</div></div>
+                </div>
+                <div className={`font-display font-bold text-xl mb-4 ${result.won ? "text-green-400" : "text-white/60"}`} data-testid="result-status">
+                  {result.won ? `You won +${result.prize} coins!` : "Just missed it!"}
+                </div>
+                <button onClick={reset} data-testid="play-again-btn"
+                  className="w-full py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors flex items-center justify-center gap-2">
+                  <RotateCcw className="h-4 w-4" /> New Challenge
+                </button>
+              </motion.div>
+            )}
           </motion.div>
         )}
+      </AnimatePresence>
 
-        {phase === "result" && result && (
-          <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl pz-glass p-8 text-center">
-            {result.won ? <Trophy className="h-14 w-14 text-green-400 mx-auto mb-4" /> : <XCircle className="h-14 w-14 text-white/30 mx-auto mb-4" />}
-            <h2 className="font-display font-bold text-2xl mb-1" data-testid="result-status">{result.won ? "Bullseye!" : "So close!"}</h2>
-            {result.flagged && <p className="text-pazer-red text-xs mb-2">Result flagged by anti-cheat.</p>}
-            <div className="grid grid-cols-3 gap-3 my-6">
-              <div className="bg-black/40 rounded-xl p-4"><div className="text-xs text-white/40 mb-1">Your time</div><div className="font-mono-pz text-xl font-bold" data-testid="result-time">{result.recorded?.toFixed(2)}s</div></div>
-              <div className="bg-black/40 rounded-xl p-4"><div className="text-xs text-white/40 mb-1">Target</div><div className="font-mono-pz text-xl font-bold">{result.target}s</div></div>
-              <div className="bg-black/40 rounded-xl p-4"><div className="text-xs text-white/40 mb-1">Off by</div><div className="font-mono-pz text-xl font-bold text-pazer-red">{result.diff?.toFixed(2)}s</div></div>
-            </div>
-            <div className={`font-mono-pz font-bold text-lg mb-6 ${result.won ? "text-green-400" : "text-white/50"}`}>
-              {result.won ? `+${result.prize} coins` : "No prize this round"}
-            </div>
-            <button onClick={reset} data-testid="play-again-btn"
-              className="w-full py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors flex items-center justify-center gap-2">
-              <RotateCcw className="h-4 w-4" /> Play Again
-            </button>
+      {/* Loss -> encouraging replay popup */}
+      <AnimatePresence>
+        {lossModal && result && !result.won && (
+          <motion.div className="fixed inset-0 z-[95] flex items-center justify-center px-6"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} data-testid="loss-replay-popup">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setLossModal(false)} />
+            <motion.div initial={{ scale: 0.75, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="relative w-full max-w-sm rounded-3xl pz-glass border border-pazer-red/40 p-7 text-center pz-glow-box">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-pazer-red/15 flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-pazer-red" />
+              </div>
+              <h3 className="font-display font-bold text-xl mb-1">Don't worry — play again!</h3>
+              <p className="text-white/60 text-sm mb-1">You stopped at <span className="font-mono-pz text-white">{result.recorded?.toFixed(2)}s</span> (target {result.target}s).</p>
+              <p className="text-white/70 text-sm mb-6">Nail it this time and win <span className="text-green-400 font-bold">{potential.toLocaleString()} coins</span> (5×).</p>
+              <button onClick={() => startWith(bet, target)} disabled={busy} data-testid="loss-replay-btn"
+                className="w-full py-3.5 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Play Again ({bet}) & Win {potential.toLocaleString()}
+              </button>
+              <button onClick={() => setLossModal(false)} className="mt-3 text-white/40 text-sm hover:text-white">Maybe later</button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

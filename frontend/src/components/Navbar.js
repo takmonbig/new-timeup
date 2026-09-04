@@ -22,7 +22,7 @@ export function Navbar() {
     return () => window.removeEventListener("wallet:refresh", refetch);
   }, []);
 
-  const doLogout = async () => { await logout(); nav("/"); };
+  const doLogout = async () => { await logout(); nav("/welcome"); };
 
   return (
     <header className="sticky top-0 z-50 pz-glass">

@@ -1,6 +1,6 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute, PublicLayout } from "@/components/ProtectedRoute";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -16,14 +16,21 @@ import Profile from "@/pages/Profile";
 import Support from "@/pages/Support";
 import Admin from "@/pages/Admin";
 
+function RootRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return <Navigate to={user ? "/home" : "/login"} replace />;
+}
+
 function App() {
   return (
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<RootRedirect />} />
             <Route element={<PublicLayout />}>
-              <Route path="/" element={<Landing />} />
+              <Route path="/welcome" element={<Landing />} />
               <Route path="/support" element={<Support />} />
             </Route>
             <Route path="/login" element={<Login />} />
@@ -41,6 +48,7 @@ function App() {
             <Route element={<ProtectedRoute adminOnly />}>
               <Route path="/admin" element={<Admin />} />
             </Route>
+            <Route path="*" element={<RootRedirect />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

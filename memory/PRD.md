@@ -54,3 +54,18 @@ PAZER: a skill-based stopwatch timing game platform. Players stop a stopwatch as
 - **Weekly Leaderboard**: `/api/leaderboard/weekly` blends real 7-day winners with auto-generated promotional entries that reshuffle daily (seeded by date). New /leaderboard page (podium + list) added as 5th bottom-nav tab "Ranks". Admin config `leaderboard_config` (enabled/auto_generate/fake_count/min_win/max_win/name_pool/manual_entries).
 - get_config now MERGES new config keys without wiping admin customisations.
 - Verified: iteration_3 32/32 backend tests pass, 100% frontend flows, zero issues.
+
+## Iteration 4-5 — Deployment fixes + UX Overhaul (2026-06)
+Deployment blockers fixed (deployment_agent now PASS, zero findings):
+- Leaderboard N+1 query -> single `$lookup` aggregation.
+- **mobile unique index crash**: legacy null/empty mobile caused DuplicateKey on startup -> now a PARTIAL unique index (non-empty strings only) and ALL index creation wrapped in try/except so data issues never crash startup.
+- CORS_ORIGINS="*"; removed TTL (expireAfterSeconds) auto-delete index on password_reset_tokens (plain index).
+
+UX/feature overhaul (verified iter5 14/14 + full regression, all critical frontend flows pass):
+- Sci-fi animated background site-wide; onboarding Guide on first Home visit.
+- Routing: `/` -> login when logged out; login/register -> splash -> /home; logout -> `/welcome` marketing landing.
+- Stopwatch STOP fix: timer SVG set pointer-events-none + non-overlapping layout -> reliable single-tap stop.
+- Errors (insufficient balance / bet too low) now show as a stylish CENTER popup (not header) with "Add Coins" action.
+- Loss -> encouraging popup to replay the SAME bet+target instantly (win 5x message).
+- KYC replaced Aadhaar with payout method: UPI (id+name) or Bank (acc no, name, IFSC, bank).
+- Completed rooms show only COMPLETED (no refunded/cancelled); TEST users hidden from leaderboard.

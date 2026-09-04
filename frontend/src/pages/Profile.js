@@ -16,7 +16,7 @@ export default function Profile() {
   const { user, refreshUser } = useAuth();
   const [stats, setStats] = useState(null);
   const [wallet, setWallet] = useState(null);
-  const [kyc, setKyc] = useState({ full_name: "", document_type: "aadhaar", document_number: "", dob: "" });
+  const [kyc, setKyc] = useState({ full_name: "", method: "upi", account_number: "", ifsc: "", bank_name: "", account_name: "", upi_id: "", upi_name: "" });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -120,12 +120,35 @@ export default function Profile() {
           <form onSubmit={submitKyc} className="space-y-3">
             <input required placeholder="Full legal name" value={kyc.full_name} onChange={(e) => setKyc({ ...kyc, full_name: e.target.value })} data-testid="kyc-name"
               className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
-            <select value={kyc.document_type} onChange={(e) => setKyc({ ...kyc, document_type: e.target.value })}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none">
-              <option value="aadhaar">Aadhaar</option><option value="pan">PAN</option><option value="passport">Passport</option>
-            </select>
-            <input required placeholder="Document number" value={kyc.document_number} onChange={(e) => setKyc({ ...kyc, document_number: e.target.value })} data-testid="kyc-docnum"
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+            <div className="grid grid-cols-2 gap-2">
+              {["upi", "bank"].map((m) => (
+                <button type="button" key={m} onClick={() => setKyc({ ...kyc, method: m })} data-testid={`kyc-method-${m}`}
+                  className={`py-2.5 rounded-lg text-sm font-semibold uppercase tracking-wide transition-colors ${kyc.method === m ? "bg-pazer-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
+                  {m === "upi" ? "UPI" : "Bank"}
+                </button>
+              ))}
+            </div>
+            {kyc.method === "upi" ? (
+              <>
+                <input required placeholder="UPI ID (e.g. name@upi)" value={kyc.upi_id} onChange={(e) => setKyc({ ...kyc, upi_id: e.target.value })} data-testid="kyc-upi-id"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+                <input required placeholder="Name on UPI" value={kyc.upi_name} onChange={(e) => setKyc({ ...kyc, upi_name: e.target.value })} data-testid="kyc-upi-name"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+              </>
+            ) : (
+              <>
+                <input required placeholder="Account number" value={kyc.account_number} onChange={(e) => setKyc({ ...kyc, account_number: e.target.value })} data-testid="kyc-account-number"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+                <input required placeholder="Account holder name" value={kyc.account_name} onChange={(e) => setKyc({ ...kyc, account_name: e.target.value })} data-testid="kyc-account-name"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input required placeholder="IFSC code" value={kyc.ifsc} onChange={(e) => setKyc({ ...kyc, ifsc: e.target.value.toUpperCase() })} data-testid="kyc-ifsc"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+                  <input required placeholder="Bank name" value={kyc.bank_name} onChange={(e) => setKyc({ ...kyc, bank_name: e.target.value })} data-testid="kyc-bank-name"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+                </div>
+              </>
+            )}
             <button disabled={busy} data-testid="kyc-submit" className="w-full py-2.5 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit KYC
             </button>

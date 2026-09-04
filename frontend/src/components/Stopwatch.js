@@ -2,25 +2,22 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "re
 import { motion } from "framer-motion";
 
 function fmt(ms) {
-  const total = Math.max(0, ms);
-  const secs = total / 1000;
-  return secs.toFixed(2);
+  return (Math.max(0, ms) / 1000).toFixed(2);
 }
 
-/**
- * High-resolution stopwatch. Exposes start/stop/reset via ref.
- * onStop(elapsedSeconds) fires when stopped.
- */
+const SIZE = 280;
+const R = 120;
+const C = 2 * Math.PI * R;
+
 const Stopwatch = forwardRef(function Stopwatch({ target, running, onTick }, ref) {
-  const [elapsed, setElapsed] = useState(0); // ms
+  const [elapsed, setElapsed] = useState(0);
   const startRef = useRef(null);
   const rafRef = useRef(null);
   const runningRef = useRef(false);
 
   const loop = () => {
     if (!runningRef.current) return;
-    const now = performance.now();
-    const e = now - startRef.current;
+    const e = performance.now() - startRef.current;
     setElapsed(e);
     if (onTick) onTick(e / 1000);
     rafRef.current = requestAnimationFrame(loop);
@@ -34,6 +31,7 @@ const Stopwatch = forwardRef(function Stopwatch({ target, running, onTick }, ref
       rafRef.current = requestAnimationFrame(loop);
     },
     stop() {
+      if (!runningRef.current) return elapsed / 1000;
       runningRef.current = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       const finalMs = performance.now() - startRef.current;
@@ -50,42 +48,40 @@ const Stopwatch = forwardRef(function Stopwatch({ target, running, onTick }, ref
   useEffect(() => () => rafRef.current && cancelAnimationFrame(rafRef.current), []);
 
   const value = fmt(elapsed);
-  const nearTarget = target && Math.abs(elapsed / 1000 - target) < 0.5;
+  const progress = target ? Math.min(1, elapsed / 1000 / target) : 0;
 
   return (
-    <div className="relative flex flex-col items-center justify-center select-none">
-      <svg className="absolute" width="360" height="360" viewBox="0 0 360 360" style={{ maxWidth: "90vw" }}>
-        <circle cx="180" cy="180" r="150" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
+    <div className="relative flex items-center justify-center pointer-events-none select-none"
+      style={{ width: SIZE, height: SIZE, maxWidth: "82vw", maxHeight: "82vw" }}>
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${SIZE} ${SIZE}`}>
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
         <motion.circle
-          cx="180" cy="180" r="150" fill="none"
-          stroke="#ff2a2a" strokeWidth="3" strokeLinecap="round"
-          strokeDasharray={2 * Math.PI * 150}
+          cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
+          stroke="#ff2a2a" strokeWidth="4" strokeLinecap="round" strokeDasharray={C}
           animate={{
-            strokeDashoffset: running
-              ? 2 * Math.PI * 150 * (1 - Math.min(1, (elapsed / 1000) / (target || 10)))
-              : 2 * Math.PI * 150,
-            filter: running ? "drop-shadow(0 0 12px rgba(255,42,42,0.7))" : "none",
+            strokeDashoffset: running ? C * (1 - progress) : C,
+            filter: running ? "drop-shadow(0 0 10px rgba(255,42,42,0.75))" : "none",
           }}
-          transition={{ duration: 0.1, ease: "linear" }}
-          transform="rotate(-90 180 180)"
+          transition={{ duration: 0.08, ease: "linear" }}
+          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
         />
       </svg>
-      <motion.div
-        animate={{ scale: running ? [1, 1.015, 1] : 1 }}
-        transition={{ duration: 0.8, repeat: running ? Infinity : 0 }}
-        className={`font-mono-pz font-extrabold tracking-tighter tabular-nums z-10 ${
-          running || nearTarget ? "text-pazer-red pz-glow" : "text-white"
-        }`}
-        style={{ fontSize: "clamp(3.5rem, 16vw, 6.5rem)" }}
-        data-testid="stopwatch-display"
-      >
-        {value}
-      </motion.div>
-      {target ? (
-        <div className="z-10 mt-2 font-mono-pz text-sm text-white/50 uppercase tracking-widest">
-          Target · {Number(target).toFixed(2)}s
-        </div>
-      ) : null}
+      <div className="relative flex flex-col items-center pointer-events-none">
+        <motion.div
+          animate={{ scale: running ? [1, 1.02, 1] : 1 }}
+          transition={{ duration: 0.8, repeat: running ? Infinity : 0 }}
+          className={`font-mono-pz font-extrabold tracking-tighter tabular-nums ${running ? "text-pazer-red pz-glow" : "text-white"}`}
+          style={{ fontSize: "clamp(3rem, 15vw, 5rem)", lineHeight: 1 }}
+          data-testid="stopwatch-display"
+        >
+          {value}
+        </motion.div>
+        {target ? (
+          <div className="mt-2 font-mono-pz text-xs text-white/50 uppercase tracking-widest">
+            Target · {Number(target).toFixed(2)}s
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 });

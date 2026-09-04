@@ -5,6 +5,7 @@ import { Users, Clock, Coins, Loader2, Swords } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { showPopup } from "@/components/CenterPopup";
 
 function Countdown({ deadline }) {
   const [left, setLeft] = useState("");
@@ -48,7 +49,11 @@ export function RoomList({ mode, title, subtitle, Icon = Users, payoutLabel }) {
       toast.success("Joined room!");
       window.dispatchEvent(new Event("wallet:refresh"));
       const id = confirm.id; setConfirm(null); nav(`/room/${id}`);
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    } catch (e) {
+      const detail = formatApiError(e.response?.data?.detail);
+      if (/insufficient/i.test(detail)) showPopup({ type: "wallet", title: "Insufficient balance", message: "Add coins to join this room." });
+      else showPopup({ type: "warning", title: "Can't join", message: detail });
+    }
     finally { setBusy(false); }
   };
 

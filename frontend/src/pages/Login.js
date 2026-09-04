@@ -5,11 +5,13 @@ import { Loader2, Eye, EyeOff, Phone } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatApiError } from "@/lib/api";
 import { LOGO_URL } from "@/lib/brand";
+import { COUNTRIES } from "@/lib/countries";
 
 export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
   const [mobile, setMobile] = useState("");
+  const [dial, setDial] = useState("91");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
@@ -19,7 +21,7 @@ export default function Login() {
     e.preventDefault();
     setErr(""); setBusy(true);
     try {
-      const u = await login(mobile, password);
+      const u = await login(dial + mobile, password);
       nav(u.role === "admin" ? "/admin" : "/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);
@@ -37,12 +39,18 @@ export default function Login() {
           <p className="text-white/50 text-sm mb-6">Master your timing.</p>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="text-xs uppercase tracking-wider text-white/50">Mobile Number</label>
-              <div className="mt-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
-                <Phone className="h-4 w-4 text-white/40 ml-4" />
-                <input data-testid="login-mobile" type="tel" inputMode="numeric" required value={mobile}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
-                  className="w-full bg-transparent px-3 py-3 outline-none" placeholder="10-digit mobile" />
+              <label className="text-xs uppercase tracking-wider text-white/50">Country &amp; Mobile Number</label>
+              <div className="mt-1 flex items-center gap-2">
+                <select data-testid="login-country" value={dial} onChange={(e) => setDial(e.target.value)}
+                  className="bg-black/40 border border-white/10 rounded-lg px-2 py-3 outline-none focus:border-pazer-red text-sm max-w-[120px]">
+                  {COUNTRIES.map((c) => <option key={c.code} value={c.dial} className="bg-pazer-card">{c.flag} +{c.dial}</option>)}
+                </select>
+                <div className="flex-1 flex items-center bg-black/40 border border-white/10 rounded-lg focus-within:border-pazer-red transition-colors">
+                  <Phone className="h-4 w-4 text-white/40 ml-4" />
+                  <input data-testid="login-mobile" type="tel" inputMode="numeric" required value={mobile}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                    className="w-full bg-transparent px-3 py-3 outline-none" placeholder="Mobile number" />
+                </div>
               </div>
             </div>
             <div>

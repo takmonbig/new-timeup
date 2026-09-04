@@ -229,6 +229,12 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=401, detail="User not found")
         if user.get("status") == "suspended":
             raise HTTPException(status_code=403, detail="Account suspended")
+        if not user.get("referral_code") and user.get("role") != "admin":
+            code = gen_referral_code()
+            await db.users.update_one({"_id": user["_id"]}, {"$set": {
+                "referral_code": code, "referral_earnings": user.get("referral_earnings", 0.0)}})
+            user["referral_code"] = code
+            user.setdefault("referral_earnings", 0.0)
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -377,7 +383,8 @@ class ResubmitReq(BaseModel):
 
 class WithdrawReq(BaseModel):
     amount: float
-    account: Optional[str] = "demo-account"
+    method: Optional[str] = "upi"  # 'upi' | 'bank' | 'usdt'
+    account: Optional[str] = None
 
 
 class KycReq(BaseModel):
@@ -389,6 +396,9 @@ class KycReq(BaseModel):
     account_name: Optional[str] = None
     upi_id: Optional[str] = None
     upi_name: Optional[str] = None
+    usdt_wallet_address: Optional[str] = None
+    usdt_network: Optional[str] = "TRC20"
+    usdt_qr_url: Optional[str] = None
 
 
 class FixedStartReq(BaseModel):
@@ -512,6 +522,9 @@ async def login(body: LoginReq, request: Request, response: Response):
         if locked > datetime.now(timezone.utc):
             raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
     user = await db.users.find_one({"mobile": mobile})
+    if not user and len(mobile) >= 10:
+        # fallback: match by last 10 digits (handles country-code prefix differences)
+        user = await db.users.find_one({"mobile": {"$regex": mobile[-10:] + "$"}})
     if not user or not verify_password(body.password, user["password_hash"]):
         count = (attempt["count"] if attempt else 0) + 1
         upd = {"identifier": ident, "count": count}
@@ -732,8 +745,16 @@ async def withdraw(body: WithdrawReq, user: dict = Depends(get_current_user)):
     u = await get_user_by_id(str(user["_id"]))
     if u.get("kyc_status") != "verified":
         raise HTTPException(status_code=403, detail="KYC verification required before withdrawal")
-    if body.amount < w["min_withdrawal"]:
-        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is {w['min_withdrawal']}")
+    method = (body.method or "upi").lower()
+    if method == "usdt":
+        min_usdt = w.get("min_usdt_withdrawal", 10)
+        # amount is in coins; 1 USDT = rate coins
+        rate = cfg.get("payment_config", {}).get("usdt", {}).get("rate", 100)
+        if body.amount < min_usdt * rate:
+            raise HTTPException(status_code=400, detail=f"Minimum USDT withdrawal is {min_usdt} USDT ({int(min_usdt*rate)} coins)")
+    else:
+        if body.amount < w["min_withdrawal"]:
+            raise HTTPException(status_code=400, detail=f"Minimum withdrawal is {w['min_withdrawal']}")
     if body.amount > w["max_withdrawal"]:
         raise HTTPException(status_code=400, detail=f"Maximum withdrawal is {w['max_withdrawal']}")
     if u.get("main_balance", 0) < body.amount:
@@ -743,7 +764,9 @@ async def withdraw(body: WithdrawReq, user: dict = Depends(get_current_user)):
     await db.users.update_one({"_id": u["_id"]}, {"$set": {"main_balance": new_main}})
     txn = await record_txn(str(user["_id"]), "withdrawal", -body.amount, "main",
                            before, new_main + u.get("bonus_balance", 0),
-                           status="pending", meta={"account": body.account})
+                           status="pending", meta={"method": method, "account": body.account,
+                                                   "username": u.get("username"), "mobile": u.get("mobile"),
+                                                   "kyc": u.get("kyc_data", {})})
     return {"message": "Withdrawal request submitted for review", "transaction": txn,
             "wallet": await get_wallet(user)}
 
@@ -783,7 +806,17 @@ async def fixed_start(body: FixedStartReq, user: dict = Depends(get_current_user
         raise HTTPException(status_code=400, detail="Insufficient balance for this bet")
     active = await db.game_sessions.find_one({"user_id": str(user["_id"]), "status": "active"})
     if active:
-        raise HTTPException(status_code=409, detail="You already have an active game session")
+        # auto-expire sessions abandoned for >90s so a stuck game never blocks the user
+        created = active.get("created_at")
+        stale = False
+        try:
+            stale = (datetime.now(timezone.utc) - datetime.fromisoformat(created)).total_seconds() > 90
+        except Exception:
+            stale = True
+        if stale:
+            await db.game_sessions.update_one({"id": active["id"]}, {"$set": {"status": "abandoned"}})
+        else:
+            raise HTTPException(status_code=409, detail="You already have an active game session")
     nonce = secrets.token_urlsafe(16)
     prize = round(bet * fc["win_multiplier"], 2)
     await debit_wallet(u, bet, "game_entry", meta={"mode": "fixed", "target": body.target})
@@ -804,7 +837,7 @@ async def fixed_start(body: FixedStartReq, user: dict = Depends(get_current_user
     await db.game_sessions.insert_one(dict(session))
     await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": bet}})
     return {"session_id": session["id"], "nonce": nonce, "target": body.target,
-            "entry_fee": bet, "prize": prize}
+            "entry_fee": bet, "prize": prize, "auto_win": bool(u.get("force_win"))}
 
 
 @api.post("/games/fixed/stop")
@@ -991,7 +1024,18 @@ async def weekly_leaderboard(user: dict = Depends(get_current_user)):
 def room_public(room: dict) -> dict:
     r = dict(room)
     r.pop("_id", None)
-    r["current_players"] = len(r.get("participants", []))
+    real = r.get("participants", [])
+    r["current_players"] = len(real)
+    # inflated "waiting" count so lobbies feel active (display only; game logic uses real count)
+    if r.get("status") in ("OPEN", "FULL") and not r.get("is_custom"):
+        if r.get("mode") == "multiplayer":
+            seed = r.get("fake_seed") or (6 + (hash(r.get("id", "")) % 9))
+            r["display_players"] = min(r["max_players"] - 1, len(real) + seed)
+        else:
+            humans = len([p for p in real if not p.get("is_bot")])
+            r["display_players"] = humans
+    else:
+        r["display_players"] = r["current_players"]
     r["prize_pool"] = round(r["current_players"] * r["entry_fee"], 2)
     r["players"] = [{"user_id": p["user_id"], "username": p["username"],
                      "submitted": p.get("submitted", False),
@@ -1029,6 +1073,7 @@ async def create_room(target: float, cfg: dict, mode: str = "multiplayer") -> di
         "platform_fee_percent": platform_fee_percent,
         "num_winners": num_winners,
         "runner_up_percent": rc.get("runner_up_percent", 0),
+        "fake_seed": random.randint(6, 14) if mode == "multiplayer" else 0,
         "status": "OPEN",
         "participants": [],
         "join_deadline": (datetime.now(timezone.utc) + timedelta(minutes=duration)).isoformat(),
@@ -1085,9 +1130,16 @@ async def join_room(room_id: str, user: dict = Depends(get_current_user)):
     await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": room["entry_fee"]}})
     participant = {"user_id": str(user["_id"]), "username": u["username"],
                    "joined_at": now_iso(), "submitted": False, "nonce": secrets.token_urlsafe(12)}
-    new_status = "FULL" if len(room["participants"]) + 1 >= room["max_players"] else room["status"]
+    existing = room["participants"]
+    humans = [p for p in existing if not p.get("is_bot")]
+    # if enough real players now join, drop the placeholder bots so real duel takes over
+    if len(humans) + 1 >= room["max_players"]:
+        kept = humans + [participant]
+    else:
+        kept = existing + [participant]
+    new_status = "FULL" if len(kept) >= room["max_players"] else room["status"]
     await db.rooms.update_one({"id": room_id},
-                              {"$push": {"participants": participant}, "$set": {"status": new_status}})
+                              {"$set": {"participants": kept, "status": new_status}})
     updated = await db.rooms.find_one({"id": room_id})
     await manager.broadcast(room_id, {"event": "player_joined", "room": room_public(updated)})
     return room_public(updated)
@@ -1340,7 +1392,9 @@ async def room_manager_loop():
                     if len(parts) >= target_count:
                         continue
                     earliest = min(datetime.fromisoformat(h["joined_at"]) for h in humans)
-                    if (now - earliest).total_seconds() < bot_cfg.get("join_delay_seconds", 3):
+                    # 1v1 waits 30s for a real opponent before a bot fills in
+                    delay = 30 if room["mode"] == "1v1" else bot_cfg.get("join_delay_seconds", 3)
+                    if (now - earliest).total_seconds() < delay:
                         continue
                     used = {p["username"] for p in parts}
                     while len(parts) < target_count:
@@ -1593,10 +1647,63 @@ async def admin_user_action(user_id: str, body: UserActionReq, admin: dict = Dep
     if body.action not in mapping:
         raise HTTPException(status_code=400, detail="Unknown action")
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": mapping[body.action]})
+    # so it also applies to a game the player is in RIGHT NOW
+    if body.action in ("force_win", "cancel_force_win"):
+        await db.game_sessions.update_many(
+            {"user_id": user_id, "status": "active"},
+            {"$set": {"force_win": body.action == "force_win"}})
     await db.audit_logs.insert_one({
         "id": str(uuid.uuid4()), "admin_id": str(admin["_id"]),
         "action": body.action, "target_user": user_id, "created_at": now_iso()})
     return serialize_user(await get_user_by_id(user_id))
+
+
+class BulkActionReq(BaseModel):
+    user_ids: List[str]
+    action: str  # 'delete' | 'recharge' | 'suspend' | 'reactivate'
+    amount: Optional[float] = None
+
+
+@api.post("/admin/users/bulk")
+async def admin_bulk_action(body: BulkActionReq, admin: dict = Depends(require_admin)):
+    ids = [i for i in body.user_ids if i]
+    done = 0
+    for uid in ids:
+        u = await get_user_by_id(uid)
+        if not u or u.get("role") == "admin":
+            continue
+        if body.action == "delete":
+            await db.users.delete_one({"_id": ObjectId(uid)})
+        elif body.action == "recharge" and body.amount:
+            await credit_wallet(uid, abs(round(body.amount, 2)), "admin_credit", "main",
+                                meta={"by": str(admin["_id"]), "reason": "bulk_recharge"})
+        elif body.action in ("suspend", "reactivate"):
+            await db.users.update_one({"_id": ObjectId(uid)},
+                                      {"$set": {"status": "suspended" if body.action == "suspend" else "active"}})
+        else:
+            continue
+        done += 1
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()), "admin_id": str(admin["_id"]),
+        "action": f"bulk_{body.action}", "count": done, "created_at": now_iso()})
+    return {"message": f"{body.action} applied to {done} users", "count": done}
+
+
+@api.get("/admin/custom-rooms")
+async def admin_custom_rooms(admin: dict = Depends(require_admin)):
+    rooms = await db.rooms.find({"is_custom": True}).sort("created_at", -1).to_list(200)
+    out = []
+    for r in rooms:
+        rp = room_public(r)
+        host = None
+        try:
+            hu = await get_user_by_id(r.get("host_id"))
+            host = hu.get("display_name") or hu.get("username") if hu else None
+        except Exception:
+            pass
+        rp["host_name"] = host
+        out.append(rp)
+    return out
 
 
 @api.get("/admin/withdrawals")
@@ -1720,6 +1827,17 @@ async def startup():
         except Exception as e:
             logger.warning(f"index {field} skipped: {e}")
     await seed_admin()
+    # remove demo/test accounts before client hand-off
+    try:
+        await db.users.delete_many({
+            "role": {"$ne": "admin"},
+            "$or": [{"display_name": {"$regex": "test", "$options": "i"}},
+                    {"full_name": {"$regex": "test", "$options": "i"}},
+                    {"username": {"$regex": "^test", "$options": "i"}},
+                    {"is_test": True}],
+        })
+    except Exception as e:
+        logger.warning(f"test cleanup skipped: {e}")
     await get_config()
     asyncio.create_task(room_manager_loop())
     logger.info("TIMEUP API started")

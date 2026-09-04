@@ -86,13 +86,13 @@ export function RoomList({ mode, title, subtitle, Icon = Users, payoutLabel }) {
             </div>
             <div className="space-y-1.5 text-sm mb-3">
               <div className="flex items-center justify-between text-white/60"><span className="flex items-center gap-1.5"><Coins className="h-4 w-4" />Entry</span><span className="font-mono-pz text-white">{r.entry_fee}</span></div>
-              <div className="flex items-center justify-between text-white/60"><span className="flex items-center gap-1.5"><Users className="h-4 w-4" />Players</span><span className="font-mono-pz text-white">{r.current_players}/{r.max_players}</span></div>
+              <div className="flex items-center justify-between text-white/60"><span className="flex items-center gap-1.5"><Users className="h-4 w-4" />Players</span><span className="font-mono-pz text-white">{r.display_players ?? r.current_players}/{r.max_players}</span></div>
               <div className="flex items-center justify-between text-white/60"><span>{payoutLabel}</span><span className="font-mono-pz text-green-400">{mode === "1v1" ? Math.round(r.entry_fee * (r.win_multiplier || 1.5)) : r.prize_pool}</span></div>
               {tab === "active" && r.status === "OPEN" && <div className="flex items-center justify-between text-white/60"><span className="flex items-center gap-1.5"><Clock className="h-4 w-4" />Closes</span><Countdown deadline={r.join_deadline} /></div>}
               {tab === "completed" && r.winner && <div className="flex items-center justify-between text-white/60"><span>Winner</span><span className="text-pazer-red font-semibold">{r.winner}</span></div>}
             </div>
             <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden mb-3">
-              <div className="h-full bg-pazer-red rounded-full transition-all" style={{ width: `${Math.min(100, (r.current_players / r.max_players) * 100)}%` }} />
+              <div className="h-full bg-pazer-red rounded-full transition-all" style={{ width: `${Math.min(100, ((r.display_players ?? r.current_players) / r.max_players) * 100)}%` }} />
             </div>
             {r.status === "OPEN" || r.status === "FULL" ? (
               <button onClick={() => setConfirm(r)} data-testid={`join-room-${r.id}`}
@@ -115,7 +115,7 @@ export function RoomList({ mode, title, subtitle, Icon = Users, payoutLabel }) {
               <div className="space-y-2 bg-black/40 rounded-xl p-4 text-sm">
                 <div className="flex justify-between"><span className="text-white/50">Entry fee</span><span className="font-mono-pz">{confirm.entry_fee} coins</span></div>
                 <div className="flex justify-between"><span className="text-white/50">Target</span><span className="font-mono-pz">{confirm.target} seconds</span></div>
-                <div className="flex justify-between"><span className="text-white/50">Players</span><span className="font-mono-pz">{confirm.current_players}/{confirm.max_players}</span></div>
+                <div className="flex justify-between"><span className="text-white/50">Players</span><span className="font-mono-pz">{confirm.display_players ?? confirm.current_players}/{confirm.max_players}</span></div>
                 <div className="flex justify-between"><span className="text-white/50">{payoutLabel}</span><span className="font-mono-pz text-green-400">{mode === "1v1" ? Math.round(confirm.entry_fee * (confirm.win_multiplier || 1.5)) : confirm.prize_pool || "Pool"}</span></div>
               </div>
               <p className="text-xs text-white/40">If the minimum players isn't reached, your entry is fully refunded.</p>

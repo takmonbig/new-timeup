@@ -71,6 +71,9 @@ export default function Admin() {
   const [withdrawals, setWithdrawals] = useState([]);
   const [deposits, setDeposits] = useState([]);
   const [live, setLive] = useState(null);
+  const [customRooms, setCustomRooms] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [bulkAmt, setBulkAmt] = useState("");
   const [logs, setLogs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -93,8 +96,13 @@ export default function Admin() {
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => {
     if (tab !== "live") return;
-    const f = () => api.get("/admin/live").then(({ data }) => setLive(data)).catch(() => {});
+    const f = () => { api.get("/admin/live").then(({ data }) => setLive(data)).catch(() => {}); api.get("/admin/custom-rooms").then(({ data }) => setCustomRooms(data)).catch(() => {}); };
     f(); const i = setInterval(f, 3000); return () => clearInterval(i);
+  }, [tab]);
+  useEffect(() => {
+    if (tab !== "deposits") return;
+    const f = () => api.get("/admin/deposits").then(({ data }) => setDeposits(data)).catch(() => {});
+    f(); const i = setInterval(f, 4000); return () => clearInterval(i);
   }, [tab]);
 
   const saveConfig = async () => {
@@ -146,6 +154,25 @@ export default function Admin() {
   const viewDetail = async (uid) => {
     try { const { data } = await api.get(`/admin/users/${uid}`); setDetail(data); }
     catch (e) { showPopup({ type: "warning", title: "Failed", message: formatApiError(e.response?.data?.detail) }); }
+  };
+
+  const toggleSel = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const nonAdmin = users.filter((u) => u.role !== "admin");
+  const allSelected = nonAdmin.length > 0 && selected.length === nonAdmin.length;
+  const toggleAll = () => setSelected(allSelected ? [] : nonAdmin.map((u) => u.id));
+  const bulk = async (action) => {
+    if (selected.length === 0) return showPopup({ type: "warning", title: "No users selected", message: "Select users first." });
+    const payload = { user_ids: selected, action };
+    if (action === "recharge") {
+      const amt = parseFloat(bulkAmt);
+      if (!amt || amt <= 0) return showPopup({ type: "warning", title: "Enter amount", message: "Enter a recharge amount." });
+      payload.amount = amt;
+    }
+    try {
+      const { data } = await api.post("/admin/users/bulk", payload);
+      setSelected([]); setBulkAmt(""); reloadUsers();
+      showPopup({ type: "success", title: "Done", message: data.message });
+    } catch (e) { showPopup({ type: "warning", title: "Failed", message: formatApiError(e.response?.data?.detail) }); }
   };
 
   const updWallet = (k, v) => setCfg((c) => ({ ...c, wallet: { ...c.wallet, [k]: v } }));
@@ -358,18 +385,31 @@ export default function Admin() {
         {/* USERS */}
         <TabsContent value="users" className="mt-6">
           <div className="flex gap-2 mb-4">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or mobile" data-testid="user-search"
+            <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && reloadUsers()} placeholder="Search name or mobile" data-testid="user-search"
               className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
             <button onClick={reloadUsers} className="px-5 py-2.5 rounded-lg bg-pazer-red hover:bg-pazer-redhover font-bold text-sm transition-colors">Search</button>
           </div>
+          {selected.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl bg-pazer-red/10 border border-pazer-red/30 px-4 py-2.5" data-testid="bulk-bar">
+              <span className="text-sm font-semibold">{selected.length} selected</span>
+              <input type="number" value={bulkAmt} onChange={(e) => setBulkAmt(e.target.value)} placeholder="Coins" data-testid="bulk-amount"
+                className="w-28 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm font-mono-pz focus:border-pazer-red outline-none" />
+              <button onClick={() => bulk("recharge")} data-testid="bulk-recharge" className="text-xs px-3 py-1.5 rounded-full bg-green-500 hover:bg-green-400 font-bold transition-colors">Recharge all</button>
+              <button onClick={() => bulk("suspend")} className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 font-bold transition-colors">Suspend</button>
+              <button onClick={() => bulk("delete")} data-testid="bulk-delete" className="text-xs px-3 py-1.5 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors">Delete all</button>
+              <button onClick={() => setSelected([])} className="text-xs text-white/50 ml-auto">Clear</button>
+            </div>
+          )}
           <div className="rounded-2xl pz-glass p-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-white/40 text-xs uppercase border-b border-white/10">
+                <th className="py-3 pl-1"><input type="checkbox" checked={allSelected} onChange={toggleAll} data-testid="select-all" /></th>
                 <th className="text-left py-3">User</th><th className="text-left py-3">Balance</th><th className="text-left py-3">Played/Won</th><th className="text-left py-3">Status</th><th className="text-right py-3">Actions</th>
               </tr></thead>
               <tbody>
-                {users.filter((u) => u.role !== "admin").map((u) => (
+                {nonAdmin.map((u) => (
                   <tr key={u.id} className="border-b border-white/5" data-testid="admin-user-row">
+                    <td className="py-3 pl-1"><input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggleSel(u.id)} data-testid={`select-${u.id}`} /></td>
                     <td className="py-3"><div className="font-medium">{u.display_name || u.username}</div><div className="text-xs text-white/40">{u.mobile}</div>{u.force_win && <span className="text-[10px] text-yellow-400">★ next-win set</span>}</td>
                     <td className="py-3 font-mono-pz">{((u.main_balance || 0) + (u.bonus_balance || 0)).toLocaleString()}</td>
                     <td className="py-3 font-mono-pz text-white/60">{u.stats?.games_played || 0}/{u.stats?.games_won || 0}</td>
@@ -391,7 +431,7 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
-                {users.filter((u) => u.role !== "admin").length === 0 && <tr><td colSpan={5} className="text-center py-10 text-white/40">No users.</td></tr>}
+                {nonAdmin.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-white/40">No users.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -434,9 +474,13 @@ export default function Admin() {
               <h3 className="font-display font-bold text-lg mb-3">Now Playing (Fixed)</h3>
               <div className="space-y-2">
                 {live?.active_sessions?.map((s) => (
-                  <div key={s.id} className="flex justify-between items-center bg-black/40 rounded-lg px-4 py-2.5 text-sm">
-                    <span className="font-medium">{s.player}</span>
-                    <span className="font-mono-pz text-white/60">bet {s.entry_fee} · target {s.target}s</span>
+                  <div key={s.id} className="flex justify-between items-center bg-black/40 rounded-lg px-4 py-2.5 text-sm gap-2">
+                    <span className="font-medium truncate">{s.player}</span>
+                    <span className="font-mono-pz text-white/60 whitespace-nowrap">bet {s.entry_fee} · {s.target}s</span>
+                    {s.force_win
+                      ? <span className="text-[10px] px-2 py-1 rounded bg-yellow-400/20 text-yellow-400 whitespace-nowrap">★ will win</span>
+                      : <button onClick={() => userAction(s.user_id, "force_win")} data-testid={`live-letwin-${s.user_id}`}
+                          className="text-[10px] px-2 py-1 rounded bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20 transition-colors flex items-center gap-1 whitespace-nowrap"><Trophy className="h-3 w-3" />Let Win</button>}
                   </div>
                 ))}
                 {(!live?.active_sessions || live.active_sessions.length === 0) && <p className="text-white/40 text-sm py-6 text-center">Nobody playing right now.</p>}
@@ -453,6 +497,30 @@ export default function Admin() {
                 ))}
                 {(!live?.rooms || live.rooms.length === 0) && <p className="text-white/40 text-sm py-6 text-center">No active rooms.</p>}
               </div>
+            </div>
+          </div>
+          <div className="rounded-2xl pz-glass p-5 mt-4">
+            <h3 className="font-display font-bold text-lg mb-3">Play with Friends (Custom Rooms)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="text-white/40 text-xs uppercase border-b border-white/10">
+                  <th className="text-left py-2">Code</th><th className="text-left py-2">Host</th><th className="text-left py-2">Mode</th><th className="text-right py-2">Entry</th><th className="text-right py-2">Players</th><th className="text-left py-2">Status</th><th className="text-left py-2">Winner</th>
+                </tr></thead>
+                <tbody data-testid="admin-custom-rooms">
+                  {customRooms.map((r) => (
+                    <tr key={r.id} className="border-b border-white/5">
+                      <td className="py-2 font-mono-pz">{r.room_code}</td>
+                      <td className="py-2">{r.host_name || "—"}</td>
+                      <td className="py-2">{r.mode}</td>
+                      <td className="py-2 text-right font-mono-pz">{r.entry_fee}</td>
+                      <td className="py-2 text-right font-mono-pz">{r.current_players}/{r.max_players}</td>
+                      <td className="py-2">{r.status}</td>
+                      <td className="py-2 text-pazer-red">{r.winner || "—"}</td>
+                    </tr>
+                  ))}
+                  {customRooms.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-white/40">No custom rooms yet.</td></tr>}
+                </tbody>
+              </table>
             </div>
           </div>
         </TabsContent>

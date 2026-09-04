@@ -16,8 +16,19 @@ export default function Profile() {
   const { user, refreshUser } = useAuth();
   const [stats, setStats] = useState(null);
   const [wallet, setWallet] = useState(null);
-  const [kyc, setKyc] = useState({ full_name: "", method: "upi", account_number: "", ifsc: "", bank_name: "", account_name: "", upi_id: "", upi_name: "" });
+  const [kyc, setKyc] = useState({ full_name: "", method: "upi", account_number: "", ifsc: "", bank_name: "", account_name: "", upi_id: "", upi_name: "", usdt_wallet_address: "", usdt_network: "TRC20", usdt_qr_url: "" });
   const [busy, setBusy] = useState(false);
+  const [kycUploading, setKycUploading] = useState(false);
+  const uploadKycQr = async (file) => {
+    if (!file) return;
+    setKycUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", file); fd.append("folder", "profile");
+      const { data } = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setKyc((k) => ({ ...k, usdt_qr_url: data.url }));
+    } catch (e2) { showPopup({ type: "warning", title: "Upload failed", message: formatApiError(e2.response?.data?.detail) }); }
+    finally { setKycUploading(false); }
+  };
 
   useEffect(() => {
     api.get("/stats").then(({ data }) => setStats(data)).catch(() => {});
@@ -120,11 +131,11 @@ export default function Profile() {
           <form onSubmit={submitKyc} className="space-y-3">
             <input required placeholder="Full legal name" value={kyc.full_name} onChange={(e) => setKyc({ ...kyc, full_name: e.target.value })} data-testid="kyc-name"
               className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
-            <div className="grid grid-cols-2 gap-2">
-              {["upi", "bank"].map((m) => (
+            <div className="grid grid-cols-3 gap-2">
+              {["upi", "bank", "usdt"].map((m) => (
                 <button type="button" key={m} onClick={() => setKyc({ ...kyc, method: m })} data-testid={`kyc-method-${m}`}
                   className={`py-2.5 rounded-lg text-sm font-semibold uppercase tracking-wide transition-colors ${kyc.method === m ? "bg-pazer-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
-                  {m === "upi" ? "UPI" : "Bank"}
+                  {m}
                 </button>
               ))}
             </div>
@@ -134,6 +145,17 @@ export default function Profile() {
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
                 <input required placeholder="Name on UPI" value={kyc.upi_name} onChange={(e) => setKyc({ ...kyc, upi_name: e.target.value })} data-testid="kyc-upi-name"
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors" />
+              </>
+            ) : kyc.method === "usdt" ? (
+              <>
+                <input required placeholder="USDT wallet address (TRC20 only)" value={kyc.usdt_wallet_address} onChange={(e) => setKyc({ ...kyc, usdt_wallet_address: e.target.value })} data-testid="kyc-usdt-address"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:border-pazer-red outline-none transition-colors font-mono-pz" />
+                <label data-testid="kyc-qr-label" className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-dashed border-white/20 hover:border-pazer-red cursor-pointer transition-colors text-sm text-white/60">
+                  {kycUploading ? "Uploading…" : kyc.usdt_qr_url ? "QR uploaded ✓" : "Upload your wallet QR (optional)"}
+                  <input type="file" accept="image/*" className="hidden" data-testid="kyc-qr-input" onChange={(e) => uploadKycQr(e.target.files?.[0])} />
+                </label>
+                {kyc.usdt_qr_url && <img src={kyc.usdt_qr_url} alt="usdt qr" className="h-24 rounded-lg object-contain bg-white p-1 mx-auto" />}
+                <p className="text-xs text-yellow-400">Send/receive USDT only on the TRC20 network. Minimum withdrawal 10 USDT.</p>
               </>
             ) : (
               <>

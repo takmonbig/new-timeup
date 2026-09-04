@@ -26,7 +26,7 @@ export function WinTicker() {
     return () => clearInterval(i);
   }, []);
   return (
-    <div className="fixed bottom-[112px] inset-x-0 z-40 pointer-events-none" data-testid="win-ticker">
+    <div className="fixed bottom-[130px] inset-x-0 z-30 pointer-events-none" data-testid="win-ticker">
       <div className="mx-auto max-w-md px-3">
         <AnimatePresence mode="wait">
           <motion.div key={item.id}

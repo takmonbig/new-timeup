@@ -12,18 +12,23 @@ export function QuickActions() {
   const [refer, setRefer] = useState(false);
   return (
     <>
-      <div className="fixed bottom-[66px] inset-x-0 z-40 pointer-events-none" data-testid="quick-actions">
-        <div className="mx-auto max-w-md px-3 flex gap-2">
+      <div className="fixed bottom-[70px] inset-x-0 z-40 pointer-events-none" data-testid="quick-actions">
+        <div className="mx-auto max-w-md px-3">
           <button data-testid="open-custom-room" onClick={() => setCustom(true)}
-            className="pointer-events-auto flex-1 flex items-center justify-center gap-2 rounded-full bg-black/70 border border-pazer-red/40 backdrop-blur px-4 py-2 text-xs font-semibold hover:border-pazer-red transition-colors">
-            <Users className="h-3.5 w-3.5 text-pazer-red" /> Play with Friends
-          </button>
-          <button data-testid="open-referral" onClick={() => setRefer(true)}
-            className="pointer-events-auto flex items-center justify-center gap-2 rounded-full bg-pazer-red hover:bg-pazer-redhover px-4 py-2 text-xs font-bold transition-colors">
-            <Gift className="h-3.5 w-3.5" /> Refer &amp; Earn
+            className="pointer-events-auto w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-pazer-red to-pazer-redhover px-5 py-3.5 text-base font-extrabold shadow-lg shadow-pazer-red/30 active:scale-[0.98] transition-transform">
+            <Users className="h-5 w-5" /> Play with Friends
           </button>
         </div>
       </div>
+
+      {/* round animated Refer & Earn badge */}
+      <motion.button data-testid="open-referral" onClick={() => setRefer(true)}
+        initial={{ scale: 0 }} animate={{ scale: 1 }}
+        className="fixed bottom-[132px] right-4 z-40 h-14 w-14 rounded-full bg-black/80 border border-pazer-red flex flex-col items-center justify-center shadow-lg shadow-pazer-red/40">
+        <span className="absolute inset-0 rounded-full bg-pazer-red/40 animate-ping" />
+        <Gift className="h-5 w-5 text-pazer-red relative z-10" />
+        <span className="text-[7px] font-bold text-white/80 relative z-10 mt-0.5">REFER</span>
+      </motion.button>
       <CustomRoomModal open={custom} onClose={() => setCustom(false)} />
       <ReferralModal open={refer} onClose={() => setRefer(false)} />
     </>

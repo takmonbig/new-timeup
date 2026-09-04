@@ -22,6 +22,9 @@ export default function GameHome() {
   const [lossModal, setLossModal] = useState(false);
   const swRef = useRef(null);
   const elapsedRef = useRef(0);
+  const autoWinRef = useRef(false);
+  const phaseRef = useRef("select");
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   useEffect(() => {
     api.get("/config/public").then(({ data }) => {
@@ -40,6 +43,7 @@ export default function GameHome() {
     try {
       const { data } = await api.post("/games/fixed/start", { target: useTarget, bet: useBet });
       setSession(data);
+      autoWinRef.current = !!data.auto_win;
       setResult(null);
       setLossModal(false);
       setPhase("countdown");
@@ -59,13 +63,18 @@ export default function GameHome() {
 
   useEffect(() => {
     if (phase !== "countdown") return;
-    if (count === 0) { setPhase("running"); setTimeout(() => swRef.current?.start(), 50); return; }
+    if (count === 0) {
+      setPhase("running");
+      setTimeout(() => swRef.current?.start(), 50);
+      if (autoWinRef.current) setTimeout(() => stop(), target * 1000 + 50);
+      return;
+    }
     const t = setTimeout(() => setCount((c) => c - 1), 700);
     return () => clearTimeout(t);
   }, [phase, count]);
 
   const stop = async () => {
-    if (busy || phase !== "running") return;
+    if (busy || phaseRef.current !== "running") return;
     const elapsed = swRef.current?.stop() ?? elapsedRef.current;
     setBusy(true);
     try {
@@ -112,8 +121,9 @@ export default function GameHome() {
               <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Your Bet (min {cfg.min_bet})</div>
               <div className="flex items-center bg-black/40 border border-white/10 rounded-xl focus-within:border-pazer-red transition-colors mb-2">
                 <Coins className="h-5 w-5 text-pazer-red ml-4" />
-                <input data-testid="bet-input" type="number" min={cfg.min_bet} value={bet}
-                  onChange={(e) => setBet(Math.max(0, parseInt(e.target.value) || 0))}
+                <input data-testid="bet-input" type="number" min={cfg.min_bet} value={bet || ""} placeholder="Enter amount"
+                  onChange={(e) => setBet(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value) || 0))}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-transparent px-3 py-3.5 outline-none font-mono-pz text-xl font-bold" />
               </div>
               <div className="flex gap-2">

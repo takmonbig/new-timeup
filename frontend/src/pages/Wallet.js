@@ -41,6 +41,7 @@ export default function Wallet() {
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resubmitFor, setResubmitFor] = useState(null);
+  const [wMethod, setWMethod] = useState("upi");
 
   const load = useCallback(() => {
     api.get("/wallet").then(({ data }) => setWallet(data)).catch(() => {});
@@ -51,6 +52,10 @@ export default function Wallet() {
   useEffect(() => {
     load();
     api.get("/payment-info").then(({ data }) => setPay(data)).catch(() => {});
+    const iv = setInterval(load, 5000); // auto-refresh so approved recharges appear without manual refresh
+    const onRefresh = () => load();
+    window.addEventListener("wallet:refresh", onRefresh);
+    return () => { clearInterval(iv); window.removeEventListener("wallet:refresh", onRefresh); };
   }, [load]);
 
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function Wallet() {
     if (!amt || amt <= 0) return showPopup({ type: "warning", title: "Enter amount", message: "Please enter a valid amount." });
     setBusy(true);
     try {
-      await api.post("/wallet/withdraw", { amount: amt });
+      await api.post("/wallet/withdraw", { amount: amt, method: wMethod });
       showPopup({ type: "success", title: "Request submitted", message: "Your withdrawal is under review." });
       setModal(null); setAmount(""); load();
       window.dispatchEvent(new Event("wallet:refresh"));
@@ -231,6 +236,9 @@ export default function Wallet() {
 
             {/* Payment target details */}
             <div className="rounded-xl bg-black/40 p-4 space-y-3">
+              <div className="rounded-lg bg-yellow-400/10 border border-yellow-400/30 px-3 py-2 text-[11px] text-yellow-300 font-medium" data-testid="deposit-warning">
+                ⚠️ Always verify the {method === "upi" ? "QR code & UPI ID" : "QR code & wallet address"} before paying — details may have been updated by admin.
+              </div>
               {cfgM.name && method === "upi" && <div className="text-center text-sm font-semibold text-white/80">Pay to: {cfgM.name}</div>}
               {cfgM.qr_url ? (
                 <div className="flex flex-col items-center gap-2">
@@ -285,9 +293,19 @@ export default function Wallet() {
           <DialogHeader><DialogTitle className="font-display">Withdraw</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
+              <label className="text-xs uppercase tracking-wider text-white/50">Payout Method</label>
+              <div className="mt-1 flex gap-2">
+                {["upi", "bank", "usdt"].map((m) => (
+                  <button key={m} data-testid={`withdraw-method-${m}`} onClick={() => setWMethod(m)}
+                    className={`flex-1 py-2 rounded-full text-xs font-bold uppercase transition-colors ${wMethod === m ? "bg-pazer-red text-white" : "bg-white/5 text-white/60"}`}>{m}</button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="text-xs uppercase tracking-wider text-white/50">Amount (coins)</label>
-              <input data-testid="amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+              <input data-testid="amount-input" type="number" value={amount || ""} placeholder="Enter amount" onFocus={(e) => e.target.select()} onChange={(e) => setAmount(e.target.value)}
                 className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 focus:border-pazer-red outline-none font-mono-pz text-lg" />
+              {wMethod === "usdt" && <p className="text-xs text-yellow-400 mt-1">Minimum 10 USDT ({(pay?.usdt?.rate || 100) * 10} coins). Paid to your KYC USDT wallet.</p>}
             </div>
             <p className="text-xs text-white/40">Requires verified KYC. Reviewed by admin. Payout to your saved UPI/Bank/USDT.</p>
             <button onClick={submitWithdraw} disabled={busy} data-testid="submit-txn"

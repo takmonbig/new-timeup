@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatApiError } from "@/lib/api";
 import { LOGO_URL } from "@/lib/brand";
 import { COUNTRIES } from "@/lib/countries";
+import { fbTrack } from "@/lib/siteConfig";
 
 export default function Register() {
   const { register } = useAuth();
@@ -21,6 +22,7 @@ export default function Register() {
     setErr(""); setBusy(true);
     try {
       await register({ ...form, mobile: dial + form.mobile });
+      fbTrack("register");
       nav("/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);

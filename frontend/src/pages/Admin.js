@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Shield, Settings, Users, Banknote, ScrollText, Loader2, Save, CreditCard, Activity, Upload, Check, Trash2, KeyRound, Coins, Trophy, Eye } from "lucide-react";
+import { Shield, Settings, Users, Banknote, ScrollText, Loader2, Save, CreditCard, Activity, Upload, Check, Trash2, KeyRound, Coins, Trophy, Eye, Facebook, LifeBuoy, UserCog } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -11,10 +11,12 @@ const TABS = [
   { id: "overview", label: "Overview", icon: Shield },
   { id: "config", label: "Game Config", icon: Settings },
   { id: "payments", label: "Payments", icon: CreditCard },
+  { id: "tracking", label: "Pixel & Support", icon: Facebook },
   { id: "deposits", label: "Deposits", icon: Banknote },
   { id: "users", label: "Users", icon: Users },
   { id: "withdrawals", label: "Withdrawals", icon: Banknote },
   { id: "live", label: "Live", icon: Activity },
+  { id: "account", label: "Account", icon: UserCog },
   { id: "logs", label: "Audit Logs", icon: ScrollText },
 ];
 
@@ -84,6 +86,19 @@ export default function Admin() {
   const [adjAmt, setAdjAmt] = useState("");
   const [pwUser, setPwUser] = useState(null);
   const [pw, setPw] = useState("");
+  const [acc, setAcc] = useState({ new_mobile: "", new_password: "" });
+
+  const saveAccount = async () => {
+    const payload = {};
+    if (acc.new_mobile.trim()) payload.new_mobile = acc.new_mobile.trim();
+    if (acc.new_password.trim()) payload.new_password = acc.new_password.trim();
+    if (!payload.new_mobile && !payload.new_password) return showPopup({ type: "warning", title: "Nothing to update", message: "Enter a new mobile and/or password." });
+    try {
+      const { data } = await api.post("/admin/account", payload);
+      setAcc({ new_mobile: "", new_password: "" });
+      showPopup({ type: "success", title: "Account updated", message: data.message });
+    } catch (e) { showPopup({ type: "warning", title: "Failed", message: formatApiError(e.response?.data?.detail) }); }
+  };
 
   const loadAll = useCallback(() => {
     api.get("/admin/stats").then(({ data }) => setStats(data)).catch(() => {});
@@ -185,6 +200,9 @@ export default function Admin() {
   const updRef = (k, v) => setCfg((c) => ({ ...c, referral_config: { ...c.referral_config, [k]: v } }));
   const updUpi = (k, v) => setCfg((c) => ({ ...c, payment_config: { ...c.payment_config, upi: { ...c.payment_config.upi, [k]: v } } }));
   const updUsdt = (k, v) => setCfg((c) => ({ ...c, payment_config: { ...c.payment_config, usdt: { ...c.payment_config.usdt, [k]: v } } }));
+  const updMeta = (k, v) => setCfg((c) => ({ ...c, meta_pixel: { ...c.meta_pixel, [k]: v } }));
+  const updMetaEvent = (k, v) => setCfg((c) => ({ ...c, meta_pixel: { ...c.meta_pixel, events: { ...c.meta_pixel.events, [k]: v } } }));
+  const updSupport = (k, v) => setCfg((c) => ({ ...c, support_config: { ...c.support_config, [k]: v } }));
   const csv = (v) => String(v).split(",").map((x) => parseFloat(x.trim())).filter((x) => !isNaN(x));
 
   return (
@@ -345,6 +363,51 @@ export default function Admin() {
               <button onClick={saveConfig} disabled={saving} data-testid="save-payments-btn"
                 className="flex items-center gap-2 px-8 py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Payment Settings
+              </button>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* PIXEL & SUPPORT */}
+        <TabsContent value="tracking" className="mt-6">
+          {cfg && (
+            <div className="space-y-6">
+              <div className="rounded-2xl pz-glass p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display font-bold text-lg flex items-center gap-2"><Facebook className="h-5 w-5 text-pazer-red" />Meta Pixel</h3>
+                  <ToggleRow label="Enabled" checked={cfg.meta_pixel?.enabled} onChange={(v) => updMeta("enabled", v)} testid="toggle-pixel" />
+                </div>
+                <p className="text-xs text-white/40 mb-4">If your Meta ad account gets banned, just paste a NEW Pixel ID (or full custom snippet) from your new account here — no code changes needed.</p>
+                <div className="space-y-4">
+                  <Field label="Pixel ID" type="text" value={cfg.meta_pixel?.pixel_id} onChange={(v) => updMeta("pixel_id", v)} />
+                  <div>
+                    <label className="text-xs uppercase tracking-wider text-white/40">Custom Head Code (optional — overrides Pixel ID)</label>
+                    <textarea value={cfg.meta_pixel?.custom_head_code || ""} onChange={(e) => updMeta("custom_head_code", e.target.value)} rows={5} data-testid="pixel-custom-code"
+                      placeholder="Paste a full <script>...</script> pixel snippet here to fully replace the default" 
+                      className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono-pz focus:border-pazer-red outline-none" />
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-white/40 mb-2">Event Mapping (fbq event fired on each action)</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Field label="On Register" type="text" value={cfg.meta_pixel?.events?.register} onChange={(v) => updMetaEvent("register", v)} />
+                      <Field label="On Deposit" type="text" value={cfg.meta_pixel?.events?.deposit} onChange={(v) => updMetaEvent("deposit", v)} />
+                      <Field label="On Game Play" type="text" value={cfg.meta_pixel?.events?.game_play} onChange={(v) => updMetaEvent("game_play", v)} />
+                      <Field label="On Win" type="text" value={cfg.meta_pixel?.events?.win} onChange={(v) => updMetaEvent("win", v)} />
+                    </div>
+                    <p className="text-[11px] text-white/30 mt-2">Leave an event blank to not fire it. Standard values: CompleteRegistration, Purchase, Lead, or your own custom names.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl pz-glass p-6">
+                <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2"><LifeBuoy className="h-5 w-5 text-pazer-red" />Support &amp; Forgot Password (Telegram)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Support Telegram URL" type="text" value={cfg.support_config?.telegram_url} onChange={(v) => updSupport("telegram_url", v)} />
+                  <Field label="Forgot-Password Telegram URL" type="text" value={cfg.support_config?.forgot_password_url} onChange={(v) => updSupport("forgot_password_url", v)} />
+                </div>
+              </div>
+              <button onClick={saveConfig} disabled={saving} data-testid="save-tracking-btn"
+                className="flex items-center gap-2 px-8 py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors disabled:opacity-60">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Pixel &amp; Support
               </button>
             </div>
           )}
@@ -521,6 +584,33 @@ export default function Admin() {
                   {customRooms.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-white/40">No custom rooms yet.</td></tr>}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ACCOUNT */}
+        <TabsContent value="account" className="mt-6">
+          <div className="max-w-md rounded-2xl pz-glass p-6 space-y-4">
+            <h3 className="font-display font-bold text-lg flex items-center gap-2"><UserCog className="h-5 w-5 text-pazer-red" />Admin Account</h3>
+            <p className="text-xs text-white/40">Change the admin login mobile number and/or password. Leave a field blank to keep it unchanged.</p>
+            <div>
+              <label className="text-xs uppercase tracking-wider text-white/40">New Mobile Number</label>
+              <input value={acc.new_mobile} onChange={(e) => setAcc({ ...acc, new_mobile: e.target.value.replace(/\D/g, "") })} data-testid="admin-new-mobile"
+                placeholder="New admin mobile" className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 font-mono-pz focus:border-pazer-red outline-none" />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-wider text-white/40">New Password</label>
+              <input value={acc.new_password} onChange={(e) => setAcc({ ...acc, new_password: e.target.value })} data-testid="admin-new-password"
+                placeholder="New admin password" className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 focus:border-pazer-red outline-none" />
+            </div>
+            <button onClick={saveAccount} data-testid="save-account-btn"
+              className="w-full py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors flex items-center justify-center gap-2">
+              <Save className="h-4 w-4" /> Update Admin Account
+            </button>
+            <div className="pt-4 border-t border-white/10">
+              <button onClick={async () => { try { const { data } = await api.post("/admin/cleanup-test-accounts"); reloadUsers(); showPopup({ type: "success", title: "Cleaned", message: data.message }); } catch (e) { showPopup({ type: "warning", title: "Failed", message: formatApiError(e.response?.data?.detail) }); } }}
+                data-testid="cleanup-test-btn" className="w-full py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-sm font-semibold transition-colors">Remove Test Accounts</button>
+              <p className="text-[11px] text-white/30 mt-2 text-center">Deletes accounts whose name starts with "test".</p>
             </div>
           </div>
         </TabsContent>

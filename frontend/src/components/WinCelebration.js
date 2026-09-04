@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Coins, Trophy } from "lucide-react";
+import { fbTrack } from "@/lib/siteConfig";
 
 // Global helper — trigger a win celebration anywhere: showWin(prize)
 export function showWin(prize) {
@@ -40,6 +41,7 @@ export function WinCelebrationHost() {
     const handler = (e) => {
       setWin({ prize: e.detail?.prize || 0, key: Date.now() });
       playWinSound();
+      fbTrack("win", { value: e.detail?.prize || 0, currency: "INR" });
       clearTimeout(window.__pzWinT);
       window.__pzWinT = setTimeout(() => setWin(null), 2600);
     };

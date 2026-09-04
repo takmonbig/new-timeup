@@ -7,9 +7,12 @@ import { formatApiError } from "@/lib/api";
 import { LOGO_URL } from "@/lib/brand";
 import { COUNTRIES } from "@/lib/countries";
 
+import { useSiteConfig } from "@/lib/siteConfig";
+
 export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
+  const site = useSiteConfig();
   const [mobile, setMobile] = useState("");
   const [dial, setDial] = useState("91");
   const [password, setPassword] = useState("");
@@ -65,6 +68,10 @@ export default function Login() {
               </div>
             </div>
             {err && <p data-testid="login-error" className="text-sm text-pazer-red">{err}</p>}
+            <div className="text-right -mt-1">
+              <a href={site?.support?.forgot_password_url || "https://t.me/amoratime0109"} target="_blank" rel="noreferrer"
+                data-testid="forgot-password" className="text-xs text-white/50 hover:text-pazer-red transition-colors">Forgot password?</a>
+            </div>
             <button data-testid="login-submit" disabled={busy}
               className="w-full py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} Log in
@@ -72,6 +79,9 @@ export default function Login() {
           </form>
           <p className="text-center text-sm text-white/50 mt-6">
             No account? <Link to="/register" className="text-pazer-red hover:underline">Create one</Link>
+          </p>
+          <p className="text-center text-xs text-white/40 mt-3">
+            Need help? <a href={site?.support?.telegram_url || "https://t.me/amoratime0109"} target="_blank" rel="noreferrer" data-testid="login-support" className="text-pazer-red hover:underline">Contact support on Telegram</a>
           </p>
         </div>
       </motion.div>

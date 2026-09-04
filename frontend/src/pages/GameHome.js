@@ -7,6 +7,7 @@ import { DailyReward } from "@/components/DailyReward";
 import { Guide } from "@/components/Guide";
 import { showPopup } from "@/components/CenterPopup";
 import { showWin } from "@/components/WinCelebration";
+import { fbTrack } from "@/lib/siteConfig";
 
 const QUICK_BETS = [20, 50, 100, 200, 500];
 
@@ -44,6 +45,7 @@ export default function GameHome() {
       const { data } = await api.post("/games/fixed/start", { target: useTarget, bet: useBet });
       setSession(data);
       autoWinRef.current = !!data.auto_win;
+      fbTrack("game_play", { value: useBet, currency: "INR" });
       setResult(null);
       setLossModal(false);
       setPhase("countdown");

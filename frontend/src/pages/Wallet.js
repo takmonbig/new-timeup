@@ -5,6 +5,7 @@ import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, Loader2, Copy, 
 import api, { formatApiError } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { showPopup } from "@/components/CenterPopup";
+import { fbTrack } from "@/lib/siteConfig";
 
 const TYPE_LABEL = {
   deposit: "Deposit", bonus: "Bonus", game_entry: "Game Entry", prize: "Prize",
@@ -90,6 +91,7 @@ export default function Wallet() {
         await api.post(`/wallet/deposit-requests/${resubmitFor}/resubmit`, { screenshot_url: proof });
       } else {
         await api.post("/wallet/deposit", { method, amount: amt, screenshot_url: proof });
+        fbTrack("deposit", { value: method === "usdt" ? amt * (pay?.usdt?.rate || 100) : amt, currency: "INR" });
       }
       showPopup({ type: "success", title: "Payment submitted", message: "Our team will verify and credit your wallet shortly (usually within 30 seconds)." });
       closeDeposit();

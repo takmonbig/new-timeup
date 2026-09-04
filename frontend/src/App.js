@@ -1,6 +1,8 @@
 import "@/App.css";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { loadSiteConfig } from "@/lib/siteConfig";
 import { ProtectedRoute, PublicLayout } from "@/components/ProtectedRoute";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -23,6 +25,7 @@ function RootRedirect() {
 }
 
 function App() {
+  useEffect(() => { loadSiteConfig(); }, []);
   return (
     <div className="App">
       <AuthProvider>

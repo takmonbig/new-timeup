@@ -95,3 +95,9 @@ UX/feature overhaul (verified iter5 14/14 + full regression, all critical fronte
 - "Let Win": fixed_start returns auto_win; client auto-stops the stopwatch exactly at target so flagged users win automatically (verified: 500→580, celebration, stop at 5.00). force_win also applies to a session already in progress. fixed_start auto-expires stale (>90s) active sessions so a stuck game never blocks new starts.
 - Startup deletes demo/test accounts (name/username contains 'test') before client hand-off.
 - Verified: testing_agent iter7 (12/13) + screenshot for the auto-win fix (13/13). Known cosmetic: <option> emoji console warning (LOW, non-breaking).
+
+## Iteration 8 — Meta Pixel + Telegram support + admin account (2026-06)
+- Admin-managed Meta Pixel: config.meta_pixel {enabled, pixel_id, custom_head_code (full-snippet override for a fresh ad account after a ban), events{register,deposit,game_play,win}}. Injected client-side via lib/siteConfig.js (fetches /api/config/public on app load); fbTrack() fires mapped fbq events on register/deposit/game_play/win. Verified fbevents.js loads + window.fbq present.
+- Admin Config → new "Pixel & Support" tab to edit pixel + event names + Telegram URLs. New "Account" tab: change admin mobile + password (POST /api/admin/account) + one-click "Remove Test Accounts".
+- Telegram support + forgot-password links (admin-editable support_config.telegram_url / forgot_password_url, default https://t.me/amoratime0109) shown on Login ("Forgot password?" + support) and Profile (Help & Support card).
+- Default admin still 9999999999 / Admin@123 (changeable in Admin → Account).

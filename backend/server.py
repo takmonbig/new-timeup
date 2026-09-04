@@ -95,6 +95,21 @@ DEFAULT_CONFIG = {
         "loss_commission_percent": 7.5,
         "win_commission_percent": 2.5,
     },
+    "meta_pixel": {
+        "enabled": False,
+        "pixel_id": "",
+        "custom_head_code": "",
+        "events": {
+            "register": "CompleteRegistration",
+            "deposit": "Purchase",
+            "game_play": "Lead",
+            "win": "",
+        },
+    },
+    "support_config": {
+        "telegram_url": "https://t.me/amoratime0109",
+        "forgot_password_url": "https://t.me/amoratime0109",
+    },
     "fixed_config": {
         "enabled": True,
         "min_bet": 20,
@@ -785,6 +800,8 @@ async def public_config():
         "fixed_config": cfg["fixed_config"],
         "room_config": cfg["room_config"],
         "room_1v1_config": cfg["room_1v1_config"],
+        "meta_pixel": cfg.get("meta_pixel", {}),
+        "support": cfg.get("support_config", {}),
     }
 
 
@@ -1702,6 +1719,36 @@ async def admin_cleanup_test_accounts(admin: dict = Depends(require_admin)):
         "id": str(uuid.uuid4()), "admin_id": str(admin["_id"]),
         "action": "cleanup_test_accounts", "count": res.deleted_count, "created_at": now_iso()})
     return {"message": f"Removed {res.deleted_count} test accounts", "count": res.deleted_count}
+
+
+class AdminAccountReq(BaseModel):
+    new_password: Optional[str] = None
+    new_mobile: Optional[str] = None
+
+
+@api.post("/admin/account")
+async def admin_update_account(body: AdminAccountReq, admin: dict = Depends(require_admin)):
+    updates = {}
+    if body.new_mobile:
+        m = body.new_mobile.strip()
+        if not m.isdigit() or len(m) < 10:
+            raise HTTPException(status_code=400, detail="Enter a valid mobile number")
+        clash = await db.users.find_one({"mobile": m, "_id": {"$ne": admin["_id"]}})
+        if clash:
+            raise HTTPException(status_code=400, detail="That mobile number is already in use")
+        updates["mobile"] = m
+    if body.new_password:
+        if len(body.new_password) < 4:
+            raise HTTPException(status_code=400, detail="Password too short")
+        updates["password_hash"] = hash_password(body.new_password)
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    await db.users.update_one({"_id": admin["_id"]}, {"$set": updates})
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()), "admin_id": str(admin["_id"]),
+        "action": "admin_account_update", "fields": list(updates.keys()), "created_at": now_iso()})
+    return {"message": "Admin account updated", "mobile": updates.get("mobile", admin.get("mobile"))}
+
 
 
 @api.get("/admin/custom-rooms")

@@ -4,6 +4,7 @@ import { User, ShieldCheck, BadgeCheck, Loader2, Copy, Wallet as WalletIcon, Tro
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { showPopup } from "@/components/CenterPopup";
+import { useSiteConfig } from "@/lib/siteConfig";
 
 const KYC_BADGE = {
   not_submitted: { t: "Not Submitted", c: "bg-white/10 text-white/60" },
@@ -14,6 +15,7 @@ const KYC_BADGE = {
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const site = useSiteConfig();
   const [stats, setStats] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [kyc, setKyc] = useState({ full_name: "", method: "upi", account_number: "", ifsc: "", bank_name: "", account_name: "", upi_id: "", upi_name: "", usdt_wallet_address: "", usdt_network: "TRC20", usdt_qr_url: "" });
@@ -176,6 +178,17 @@ export default function Profile() {
             </button>
           </form>
         )}
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl pz-glass p-6 mt-6">
+        <h2 className="font-display font-bold text-lg mb-3">Help &amp; Support</h2>
+        <p className="text-sm text-white/50 mb-4">Forgot your password or need help? Our team is on Telegram.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <a href={site?.support?.telegram_url || "https://t.me/amoratime0109"} target="_blank" rel="noreferrer" data-testid="profile-support"
+            className="py-3 rounded-full bg-pazer-red hover:bg-pazer-redhover font-bold text-sm text-center transition-colors">Contact Support</a>
+          <a href={site?.support?.forgot_password_url || "https://t.me/amoratime0109"} target="_blank" rel="noreferrer" data-testid="profile-forgot"
+            className="py-3 rounded-full bg-white/5 hover:bg-white/10 font-bold text-sm text-center transition-colors">Forgot Password</a>
+        </div>
       </motion.div>
     </div>
   );

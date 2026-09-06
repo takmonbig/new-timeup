@@ -101,3 +101,11 @@ UX/feature overhaul (verified iter5 14/14 + full regression, all critical fronte
 - Admin Config → new "Pixel & Support" tab to edit pixel + event names + Telegram URLs. New "Account" tab: change admin mobile + password (POST /api/admin/account) + one-click "Remove Test Accounts".
 - Telegram support + forgot-password links (admin-editable support_config.telegram_url / forgot_password_url, default https://t.me/amoratime0109) shown on Login ("Forgot password?" + support) and Profile (Help & Support card).
 - Default admin still 9999999999 / Admin@123 (changeable in Admin → Account).
+
+## Iteration 9 — Room durations/fee-variants, 10-player rooms, 30s wait, withdrawal KYC (2026-06)
+- Rooms now fixed to 3 durations (5s/10s/15s) with admin-controlled entry-fee VARIANTS per duration (both 1v1 & multiplayer). config.room_config.entry_fees (default 30/50/75/100) + room_1v1_config.entry_fees (50/75/100/150). Auto-loop creates one room per duration×fee. ROOM_DURATIONS constant = [5,10,15].
+- Multiplayer max_players reduced to 10 (was 25); min_players 2. get_config migrates legacy config (entry_fees, max_players<=10, min_usdt fields). Startup clears stale empty auto-rooms so the grid rebuilds.
+- Both 1v1 AND multiplayer wait 30s for real players before bots fill; if real players meet the target count bots are skipped/removed and the real match starts.
+- Admin Withdrawals tab redesigned: each request shows the user's name+mobile, KYC status, payout method and full KYC payout details (UPI id / bank acct+IFSC / USDT wallet+network+QR) for easy processing. /admin/withdrawals enriches each txn with live user + kyc_data. USDT withdrawal min-10-USDT enforced (verified).
+- Admin Game Config UI now edits "Entry Fee Variants (CSV)" for 1v1 & multiplayer; durations shown as fixed.
+- Verified: room grid (12 per mode), admin config UI, withdrawal+KYC end-to-end, min-USDT enforcement.

@@ -268,22 +268,22 @@ export default function Admin() {
                 </div>
               </div>
               <div className="rounded-2xl pz-glass p-6">
-                <h3 className="font-display font-bold text-lg mb-4">1v1 Duel</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Field label="Entry Fee" value={cfg.room_1v1_config.entry_fee} onChange={(v) => updV1("entry_fee", v)} />
+                <h3 className="font-display font-bold text-lg mb-1">1v1 Duel</h3>
+                <p className="text-xs text-white/40 mb-4">Durations are fixed at 5s, 10s, 15s. Set the entry-fee variants below — one room is auto-created per duration × fee.</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <Field label="Win Multiplier" value={cfg.room_1v1_config.win_multiplier} onChange={(v) => updV1("win_multiplier", v)} />
                   <div className="flex items-end"><ToggleRow label="Enabled" checked={cfg.room_1v1_config.enabled} onChange={(v) => updV1("enabled", v)} /></div>
-                  <div className="col-span-2 md:col-span-4"><Field label="Targets (CSV)" type="text" value={(cfg.room_1v1_config.targets || []).join(",")} onChange={(v) => updV1("targets", csv(v))} /></div>
+                  <div className="col-span-2 md:col-span-3"><Field label="Entry Fee Variants (CSV coins)" type="text" value={(cfg.room_1v1_config.entry_fees || []).join(", ")} onChange={(v) => updV1("entry_fees", csv(v))} /></div>
                 </div>
               </div>
               <div className="rounded-2xl pz-glass p-6">
-                <h3 className="font-display font-bold text-lg mb-4">Multiplayer Rooms</h3>
+                <h3 className="font-display font-bold text-lg mb-1">Multiplayer Rooms</h3>
+                <p className="text-xs text-white/40 mb-4">Durations fixed at 5s, 10s, 15s. Set entry-fee variants — one room per duration × fee.</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Field label="Entry Fee" value={cfg.room_config.entry_fee} onChange={(v) => updRoom("entry_fee", v)} />
                   <Field label="Min Players" value={cfg.room_config.min_players} onChange={(v) => updRoom("min_players", v)} />
                   <Field label="Max Players" value={cfg.room_config.max_players} onChange={(v) => updRoom("max_players", v)} />
                   <Field label="Platform Fee %" value={cfg.room_config.platform_fee_percent} onChange={(v) => updRoom("platform_fee_percent", v)} />
-                  <Field label="Targets (CSV)" type="text" value={(cfg.room_config.room_targets || []).join(",")} onChange={(v) => updRoom("room_targets", csv(v))} />
+                  <div className="col-span-2 md:col-span-4"><Field label="Entry Fee Variants (CSV coins)" type="text" value={(cfg.room_config.entry_fees || []).join(", ")} onChange={(v) => updRoom("entry_fees", csv(v))} /></div>
                 </div>
               </div>
               <div className="rounded-2xl pz-glass p-6">
@@ -502,31 +502,46 @@ export default function Admin() {
 
         {/* WITHDRAWALS */}
         <TabsContent value="withdrawals" className="mt-6">
-          <div className="rounded-2xl pz-glass p-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-white/40 text-xs uppercase border-b border-white/10">
-                <th className="text-left py-3">Txn ID</th><th className="text-left py-3">User</th><th className="text-right py-3">Amount</th><th className="text-left py-3">Status</th><th className="text-right py-3">Action</th>
-              </tr></thead>
-              <tbody>
-                {withdrawals.map((w) => (
-                  <tr key={w.id} className="border-b border-white/5">
-                    <td className="py-3 font-mono-pz text-xs">{w.txn_id}</td>
-                    <td className="py-3 text-xs text-white/50">{w.user_id.slice(0, 8)}…</td>
-                    <td className="py-3 text-right font-mono-pz">{Math.abs(w.amount)}</td>
-                    <td className="py-3"><span className={w.status === "pending" ? "text-yellow-400" : w.status === "success" ? "text-green-400" : "text-white/40"}>{w.status}</span></td>
-                    <td className="py-3 text-right">
-                      {w.status === "pending" ? (
-                        <div className="flex gap-1.5 justify-end">
-                          <button onClick={() => withdrawalAction(w.txn_id, "approve")} className="text-xs px-2 py-1 rounded bg-green-400/10 text-green-400 hover:bg-green-400/20 transition-colors">Approve</button>
-                          <button onClick={() => withdrawalAction(w.txn_id, "reject")} className="text-xs px-2 py-1 rounded bg-pazer-red/10 text-pazer-red hover:bg-pazer-red/20 transition-colors">Reject</button>
-                        </div>
-                      ) : <span className="text-white/30 text-xs">—</span>}
-                    </td>
-                  </tr>
-                ))}
-                {withdrawals.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-white/40">No withdrawals.</td></tr>}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {withdrawals.map((w) => {
+              const k = w.kyc_data || {};
+              const method = k.method || w.meta?.method || "—";
+              return (
+                <div key={w.id} className="rounded-2xl pz-glass p-4" data-testid="withdrawal-row">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{w.user_name || "User"} <span className="text-white/40 text-sm font-mono-pz">{w.user_mobile || ""}</span></div>
+                      <div className="text-xs text-white/40 font-mono-pz">{w.txn_id}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono-pz font-bold text-xl text-pazer-red">{Math.abs(w.amount).toLocaleString()} coins</div>
+                      <span className={`text-xs ${w.status === "pending" ? "text-yellow-400" : w.status === "success" ? "text-green-400" : "text-white/40"}`}>{w.status}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-black/40 p-3 text-xs">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="uppercase tracking-wider text-white/40">KYC</span>
+                      <span className={`px-2 py-0.5 rounded-full ${w.kyc_status === "verified" ? "bg-green-400/10 text-green-400" : "bg-yellow-400/10 text-yellow-400"}`}>{w.kyc_status || "not submitted"}</span>
+                      <span className="text-white/40">· Payout via <b className="text-white/70 uppercase">{method}</b></span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {k.account_name && <KV l="Name" v={k.account_name || k.upi_name} />}
+                      {method === "upi" && <KV l="UPI ID" v={k.upi_id} />}
+                      {method === "bank" && <><KV l="Account" v={k.account_number} /><KV l="IFSC" v={k.ifsc} /><KV l="Bank" v={k.bank_name} /></>}
+                      {method === "usdt" && <><KV l="USDT Wallet" v={k.usdt_wallet_address} /><KV l="Network" v={k.usdt_network} /></>}
+                    </div>
+                    {method === "usdt" && k.usdt_qr_url && <img src={k.usdt_qr_url} alt="usdt qr" className="mt-2 h-20 rounded bg-white p-1" />}
+                  </div>
+                  {w.status === "pending" && (
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => withdrawalAction(w.txn_id, "approve")} data-testid={`wd-approve-${w.txn_id}`} className="flex-1 py-2 rounded-full bg-green-500 hover:bg-green-400 font-bold text-sm transition-colors">Approve &amp; Pay</button>
+                      <button onClick={() => withdrawalAction(w.txn_id, "reject")} className="flex-1 py-2 rounded-full bg-pazer-red/80 hover:bg-pazer-red font-bold text-sm transition-colors">Reject &amp; Refund</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {withdrawals.length === 0 && <p className="text-center py-10 text-white/40 rounded-2xl pz-glass">No withdrawal requests.</p>}
           </div>
         </TabsContent>
 
@@ -715,6 +730,16 @@ function Info({ l, v }) {
     <div className="bg-black/40 rounded-lg px-3 py-2">
       <div className="text-[10px] uppercase text-white/40">{l}</div>
       <div className="font-mono-pz text-white/80 break-all">{v ?? "—"}</div>
+    </div>
+  );
+}
+
+function KV({ l, v }) {
+  if (!v) return null;
+  return (
+    <div>
+      <div className="text-[10px] uppercase text-white/30">{l}</div>
+      <div className="font-mono-pz text-white/80 break-all">{v}</div>
     </div>
   );
 }

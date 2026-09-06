@@ -49,6 +49,7 @@ api = APIRouter(prefix="/api")
 
 LATENCY_BOUND = 2.5  # seconds tolerated between server-measured and client-reported elapsed
 ROOM_EXTRA_SECONDS = 5  # rooms stay LIVE for (target + this) seconds before auto-finalizing
+ROOM_DURATIONS = [5, 10, 15]  # only these 3 room durations exist (both 1v1 & multiplayer)
 CUSTOM_ROOM_MINUTES = 10  # custom private rooms expire after this many minutes if not started
 
 # ---------------------------------------------------------------------------
@@ -119,21 +120,23 @@ DEFAULT_CONFIG = {
     },
     "room_config": {
         "entry_fee": 50,
-        "min_players": 5,
-        "max_players": 25,
-        "room_duration_minutes": 30,
+        "entry_fees": [30, 50, 75, 100],
+        "min_players": 2,
+        "max_players": 10,
+        "room_duration_minutes": 5,
         "platform_fee_percent": 20,
         "num_winners": 1,
         "runner_up_percent": 0,
         "auto_room_count": 6,
-        "room_targets": [5, 10, 15, 20, 25, 30],
+        "room_targets": [5, 10, 15],
     },
     "room_1v1_config": {
         "enabled": True,
         "entry_fee": 50,
+        "entry_fees": [50, 75, 100, 150],
         "win_multiplier": 1.5,
-        "room_duration_minutes": 30,
-        "targets": [5, 8, 10, 13, 15, 18, 20, 23, 25, 30],
+        "room_duration_minutes": 5,
+        "targets": [5, 10, 15],
     },
     "bot_config": {
         "enabled": True,
@@ -184,6 +187,28 @@ async def get_config() -> dict:
     if missing:
         await db.config.update_one({"id": "global"}, {"$set": missing})
         cfg.update(missing)
+    # migrate room configs to the fixed 3-duration + fee-variants model
+    sets = {}
+    rcfg = cfg.get("room_config", {})
+    if "entry_fees" not in rcfg:
+        sets["room_config.entry_fees"] = DEFAULT_CONFIG["room_config"]["entry_fees"]
+    if rcfg.get("max_players", 25) > 10:
+        sets["room_config.max_players"] = 10
+    if rcfg.get("min_players", 5) > 5:
+        sets["room_config.min_players"] = 2
+    v1cfg = cfg.get("room_1v1_config", {})
+    if "entry_fees" not in v1cfg:
+        sets["room_1v1_config.entry_fees"] = DEFAULT_CONFIG["room_1v1_config"]["entry_fees"]
+    wcfg = cfg.get("wallet", {})
+    if "min_usdt_deposit" not in wcfg:
+        sets["wallet.min_usdt_deposit"] = DEFAULT_CONFIG["wallet"]["min_usdt_deposit"]
+    if "min_usdt_withdrawal" not in wcfg:
+        sets["wallet.min_usdt_withdrawal"] = DEFAULT_CONFIG["wallet"]["min_usdt_withdrawal"]
+    if sets:
+        await db.config.update_one({"id": "global"}, {"$set": sets})
+        for k, v in sets.items():
+            top, sub = k.split(".")
+            cfg.setdefault(top, {})[sub] = v
     return cfg
 
 
@@ -1063,17 +1088,17 @@ def room_public(room: dict) -> dict:
     return r
 
 
-async def create_room(target: float, cfg: dict, mode: str = "multiplayer") -> dict:
+async def create_room(target: float, cfg: dict, mode: str = "multiplayer", entry_fee: float = None) -> dict:
     if mode == "1v1":
         rc = cfg["room_1v1_config"]
-        entry_fee = rc["entry_fee"]
+        entry_fee = entry_fee if entry_fee is not None else rc["entry_fee"]
         min_players, max_players = 2, 2
         win_multiplier = rc["win_multiplier"]
         duration = rc["room_duration_minutes"]
         platform_fee_percent, num_winners = 0, 1
     else:
         rc = cfg["room_config"]
-        entry_fee = rc["entry_fee"]
+        entry_fee = entry_fee if entry_fee is not None else rc["entry_fee"]
         min_players, max_players = rc["min_players"], rc["max_players"]
         win_multiplier = None
         duration = rc["room_duration_minutes"]
@@ -1409,8 +1434,8 @@ async def room_manager_loop():
                     if len(parts) >= target_count:
                         continue
                     earliest = min(datetime.fromisoformat(h["joined_at"]) for h in humans)
-                    # 1v1 waits 30s for a real opponent before a bot fills in
-                    delay = 30 if room["mode"] == "1v1" else bot_cfg.get("join_delay_seconds", 3)
+                    # both modes wait 30s for real players before bots fill in
+                    delay = 30
                     if (now - earliest).total_seconds() < delay:
                         continue
                     used = {p["username"] for p in parts}
@@ -1466,19 +1491,27 @@ async def room_manager_loop():
                 all_done = room["participants"] and all(p.get("submitted") for p in room["participants"])
                 if all_done or (ld and now >= ld):
                     await finalize_room(room)
-            # ensure auto rooms exist per target (multiplayer)
+            # ensure auto rooms exist per duration × entry-fee variant (multiplayer)
             rc = cfg["room_config"]
-            for target in rc["room_targets"]:
-                exists = await db.rooms.find_one({"mode": "multiplayer", "target": target, "status": {"$in": ["OPEN", "FULL"]}})
-                if not exists:
-                    await create_room(target, cfg, "multiplayer")
-            # ensure auto 1v1 rooms exist per target
+            mp_fees = rc.get("entry_fees") or [rc.get("entry_fee", 50)]
+            for target in ROOM_DURATIONS:
+                for fee in mp_fees:
+                    exists = await db.rooms.find_one({"mode": "multiplayer", "target": target,
+                                                      "entry_fee": fee, "is_custom": {"$ne": True},
+                                                      "status": {"$in": ["OPEN", "FULL"]}})
+                    if not exists:
+                        await create_room(target, cfg, "multiplayer", entry_fee=fee)
+            # ensure auto 1v1 rooms exist per duration × entry-fee variant
             v1 = cfg.get("room_1v1_config", {})
             if v1.get("enabled", True):
-                for target in v1.get("targets", []):
-                    exists = await db.rooms.find_one({"mode": "1v1", "target": target, "status": {"$in": ["OPEN", "FULL"]}})
-                    if not exists:
-                        await create_room(target, cfg, "1v1")
+                v1_fees = v1.get("entry_fees") or [v1.get("entry_fee", 50)]
+                for target in ROOM_DURATIONS:
+                    for fee in v1_fees:
+                        exists = await db.rooms.find_one({"mode": "1v1", "target": target,
+                                                          "entry_fee": fee, "is_custom": {"$ne": True},
+                                                          "status": {"$in": ["OPEN", "FULL"]}})
+                        if not exists:
+                            await create_room(target, cfg, "1v1", entry_fee=fee)
         except Exception as e:
             logger.error(f"room loop error: {e}")
         await asyncio.sleep(5)
@@ -1770,7 +1803,18 @@ async def admin_custom_rooms(admin: dict = Depends(require_admin)):
 
 @api.get("/admin/withdrawals")
 async def admin_withdrawals(admin: dict = Depends(require_admin)):
-    return await db.transactions.find({"type": "withdrawal"}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    txns = await db.transactions.find({"type": "withdrawal"}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    for t in txns:
+        try:
+            u = await get_user_by_id(t["user_id"])
+            if u:
+                t["user_name"] = u.get("display_name") or u.get("username")
+                t["user_mobile"] = u.get("mobile")
+                t["kyc_status"] = u.get("kyc_status")
+                t["kyc_data"] = u.get("kyc_data", {})
+        except Exception:
+            pass
+    return txns
 
 
 class WithdrawalAction(BaseModel):
@@ -1890,6 +1934,14 @@ async def startup():
             logger.warning(f"index {field} skipped: {e}")
     await seed_admin()
     await get_config()
+    # clear stale empty auto-rooms (old durations/fees) so the loop rebuilds the correct grid
+    try:
+        stale = await db.rooms.find({"status": {"$in": ["OPEN", "FULL"]}, "is_custom": {"$ne": True}}).to_list(500)
+        for r in stale:
+            if not any(not p.get("is_bot") for p in r.get("participants", [])):
+                await db.rooms.delete_one({"id": r["id"]})
+    except Exception as e:
+        logger.warning(f"stale room cleanup skipped: {e}")
     asyncio.create_task(room_manager_loop())
     logger.info("TIMEUP API started")
 

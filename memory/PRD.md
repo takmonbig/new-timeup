@@ -109,3 +109,10 @@ UX/feature overhaul (verified iter5 14/14 + full regression, all critical fronte
 - Admin Withdrawals tab redesigned: each request shows the user's name+mobile, KYC status, payout method and full KYC payout details (UPI id / bank acct+IFSC / USDT wallet+network+QR) for easy processing. /admin/withdrawals enriches each txn with live user + kyc_data. USDT withdrawal min-10-USDT enforced (verified).
 - Admin Game Config UI now edits "Entry Fee Variants (CSV)" for 1v1 & multiplayer; durations shown as fixed.
 - Verified: room grid (12 per mode), admin config UI, withdrawal+KYC end-to-end, min-USDT enforcement.
+
+## Iteration 10 — Admin panel separation + daily coins 20 (2026-06)
+- Dedicated admin login at /admin/login (pages/AdminLogin.js), completely independent from user /login (distinct blue "Admin Console" theme, no country selector, no Register link). Redirects to /admin on success; non-admin roles are logged out with an error.
+- Full admin/user isolation in components/ProtectedRoute.js: admins are blocked from user pages (/home,/wallet,/1v1,/multiplayer,...) and redirected to /admin; unauth/non-admin hitting /admin redirects to /admin/login; admin dashboard renders a dedicated AdminHeader shell (logo + Sign out) with NO user Navbar/BottomNav/WinTicker/QuickActions.
+- User /login now rejects admin-role accounts with generic "Invalid credentials." (hides admin from user portal).
+- Daily free coin (login streak) reward raised from 5 → 20 (backend DEFAULT_CONFIG.streak_config.daily_bonus=20 + live DB config updated + GET /api/streak & POST /api/streak/claim credit 20).
+- Verified: testing_agent iter8 — backend 3/3, frontend 6/6 flows PASS.

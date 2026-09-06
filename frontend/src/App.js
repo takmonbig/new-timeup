@@ -17,6 +17,7 @@ import Wallet from "@/pages/Wallet";
 import Profile from "@/pages/Profile";
 import Support from "@/pages/Support";
 import Admin from "@/pages/Admin";
+import AdminLogin from "@/pages/AdminLogin";
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -38,6 +39,7 @@ function App() {
             </Route>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/splash" element={<Splash />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/home" element={<GameHome />} />

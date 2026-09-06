@@ -147,7 +147,7 @@ DEFAULT_CONFIG = {
     },
     "streak_config": {
         "enabled": True,
-        "daily_bonus": 5,
+        "daily_bonus": 20,
     },
     "leaderboard_config": {
         "enabled": True,
@@ -985,7 +985,7 @@ async def get_streak(user: dict = Depends(get_current_user)):
     last = u.get("streak_last_claim")
     return {
         "enabled": sc.get("enabled", True),
-        "daily_bonus": sc.get("daily_bonus", 5),
+        "daily_bonus": sc.get("daily_bonus", 20),
         "streak": u.get("streak_count", 0),
         "can_claim": sc.get("enabled", True) and last != today_str(),
         "last_claim": last,
@@ -1004,7 +1004,7 @@ async def claim_streak(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=409, detail="Already claimed today")
     yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     streak = u.get("streak_count", 0) + 1 if u.get("streak_last_claim") == yesterday else 1
-    bonus = sc.get("daily_bonus", 5)
+    bonus = sc.get("daily_bonus", 20)
     await db.users.update_one({"_id": u["_id"]}, {"$set": {"streak_last_claim": today, "streak_count": streak}})
     await credit_wallet(str(user["_id"]), bonus, "bonus", "bonus",
                         meta={"reason": "daily_streak", "streak": streak})

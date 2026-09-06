@@ -1,0 +1,29 @@
+{
+  "summary": "Iter8 verified both changes in the TIMEUP batch: (1) dedicated admin login isolation and admin-only routing, and (2) daily streak reward bumped to 20 coins. Backend pytest: 3/3 passed (admin login role, streak GET/claim credits +20 to fresh user, admin login role check). Frontend Playwright drove real UI: admin/login → /admin with 'Admin Console' header + Sign out, no user Navbar/BottomNav; admin visiting /home and /wallet is redirected back to /admin; /admin/login has no country selector and no Register link; unauth /admin redirects to /admin/login; admin credentials submitted on /login are rejected with 'Invalid credentials.' and remain on /login; fresh registered user lands on /home with user shell and is redirected to /admin/login when navigating to /admin. All 6 requested features PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/login and /register", "issues": ["Pre-existing React hydration console warning: <span> cannot be a child of <option> (className on <option> triggers a wrapper <span>). Cosmetic only, does not block flow. Already flagged in iter7."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_admin_and_streak.py", "/app/test_reports/pytest/admin_streak.xml"],
+  "action_items": [
+    "OPTIONAL (pre-existing): remove className on the <option> children in Login.js line 54 and Register.js line 56 to silence hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "ProtectedRoute isolation is correct: admin-role on user routes redirects to /admin, unauth on admin routes redirects to /admin/login, non-admin on admin routes redirects to /admin/login. Good separation.",
+    "AdminLogin.js correctly logs out non-admin roles after login attempt via /admin/login, preventing back-door admin.",
+    "Login.js correctly rejects admin-role users at the client with a generic 'Invalid credentials.' message; note the token is briefly issued by /api/auth/login before logout()  — acceptable UX but could be tightened server-side by an explicit admin-block toggle for /login if desired.",
+    "Backend streak_config.daily_bonus=20 is honored by both GET /api/streak and POST /api/streak/claim; claim credits exactly +20 to bonus wallet."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_and_streak.py", "/app/test_reports/iteration_8.json"],
+  "success_rate": {"backend": "3/3 (100%)", "frontend": "6/6 flows PASS (100%)"},
+  "test_credentials": "Admin: 9999999999 / Admin@123. One fresh test user created during test run for streak assertion (10-digit mobile, TEST User / Pass@123).",
+  "seed_data_creation": "2 fresh registered users created during tests (backend pytest + frontend playwright). Backend user consumed one daily streak claim (+20 coins to bonus wallet).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin/user separation and daily streak 20 are both verified. Pre-existing <option>/<span> hydration warning still open. Prior iteration issues (Let-Win auto-stop, stale active game_sessions) were out of scope for this iteration.",
+  "rca of the issue": "N/A - all requested features working as specified."
+}

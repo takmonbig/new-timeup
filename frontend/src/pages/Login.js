@@ -10,7 +10,7 @@ import { COUNTRIES } from "@/lib/countries";
 import { useSiteConfig } from "@/lib/siteConfig";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const nav = useNavigate();
   const site = useSiteConfig();
   const [mobile, setMobile] = useState("");
@@ -25,7 +25,12 @@ export default function Login() {
     setErr(""); setBusy(true);
     try {
       const u = await login(dial + mobile, password);
-      nav(u.role === "admin" ? "/admin" : "/splash");
+      if (u.role === "admin") {
+        await logout();
+        setErr("Invalid credentials.");
+        return;
+      }
+      nav("/splash");
     } catch (e2) {
       setErr(formatApiError(e2.response?.data?.detail) || e2.message);
     } finally { setBusy(false); }

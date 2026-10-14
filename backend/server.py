@@ -118,6 +118,26 @@ DEFAULT_CONFIG = {
         "win_multiplier": 5,
         "targets": [5, 7, 10, 14, 16, 21, 26, 31],
     },
+    "aviator_config": {
+        "enabled": True,
+        "min_bet": 20,
+        "max_bet": 5000,
+        "house_edge_percent": 5,
+        "max_multiplier": 100,
+        "growth_rate": 0.12,
+    },
+    "tower_config": {
+        "enabled": True,
+        "min_bet": 20,
+        "max_bet": 5000,
+        "house_edge_percent": 5,
+        "rows": 8,
+        "difficulties": {
+            "easy": {"cols": 4, "bombs": 1},
+            "medium": {"cols": 3, "bombs": 1},
+            "hard": {"cols": 2, "bombs": 1},
+        },
+    },
     "room_config": {
         "entry_fee": 50,
         "entry_fees": [30, 50, 75, 100],
@@ -449,6 +469,32 @@ class FixedStartReq(BaseModel):
 class FixedStopReq(BaseModel):
     session_id: str
     elapsed: float
+    nonce: str
+
+
+class AviatorStartReq(BaseModel):
+    bet: float
+
+
+class AviatorCashoutReq(BaseModel):
+    session_id: str
+    nonce: str
+    multiplier: float
+
+
+class TowerStartReq(BaseModel):
+    bet: float
+    difficulty: str = "easy"
+
+
+class TowerPickReq(BaseModel):
+    session_id: str
+    nonce: str
+    col: int
+
+
+class TowerCashoutReq(BaseModel):
+    session_id: str
     nonce: str
 
 
@@ -823,6 +869,8 @@ async def public_config():
         "real_money_enabled": cfg["real_money_enabled"],
         "wallet": cfg["wallet"],
         "fixed_config": cfg["fixed_config"],
+        "aviator_config": cfg.get("aviator_config", {}),
+        "tower_config": cfg.get("tower_config", {}),
         "room_config": cfg["room_config"],
         "room_1v1_config": cfg["room_1v1_config"],
         "meta_pixel": cfg.get("meta_pixel", {}),
@@ -944,6 +992,263 @@ async def fixed_stop(body: FixedStopReq, user: dict = Depends(get_current_user))
     return {"recorded": recorded, "target": session["target"], "diff": diff,
             "won": won, "prize": prize, "flagged": flagged, "game": game_record,
             "wallet": await get_wallet(user)}
+
+
+def gen_crash_point(house_edge_percent: float, max_mult: float) -> float:
+    he = max(0.0, min(0.5, house_edge_percent / 100.0))
+    r = random.random()
+    if r < he:
+        return 1.00
+    m = (1.0 - he) / (1.0 - r)
+    return round(max(1.01, min(m, max_mult)), 2)
+
+
+def tower_multipliers(cols: int, bombs: int, rows: int, house_edge_percent: float) -> List[float]:
+    safe = max(1, cols - bombs)
+    step = cols / safe
+    he = max(0.0, min(0.5, house_edge_percent / 100.0))
+    out = []
+    cur = 1.0
+    for _ in range(rows):
+        cur *= step
+        out.append(round(cur * (1.0 - he), 2))
+    return out
+
+
+@api.post("/games/aviator/start")
+async def aviator_start(body: AviatorStartReq, user: dict = Depends(get_current_user)):
+    cfg = await get_config()
+    ac = cfg.get("aviator_config", {})
+    if not cfg["game_enabled"] or not ac.get("enabled", True):
+        raise HTTPException(status_code=403, detail="Aviator is currently disabled")
+    bet = round(float(body.bet), 2)
+    if bet < ac.get("min_bet", 20):
+        raise HTTPException(status_code=400, detail=f"Minimum bet is {ac.get('min_bet', 20)} coins")
+    if bet > ac.get("max_bet", 5000):
+        raise HTTPException(status_code=400, detail=f"Maximum bet is {ac.get('max_bet', 5000)} coins")
+    u = await get_user_by_id(str(user["_id"]))
+    if u.get("main_balance", 0) + u.get("bonus_balance", 0) < bet:
+        raise HTTPException(status_code=400, detail="Insufficient balance for this bet")
+    await db.game_sessions.update_many(
+        {"user_id": str(user["_id"]), "mode": "aviator", "status": "active"},
+        {"$set": {"status": "abandoned"}})
+    max_mult = ac.get("max_multiplier", 100)
+    force_win = bool(u.get("force_win"))
+    crash_point = max_mult if force_win else gen_crash_point(ac.get("house_edge_percent", 5), max_mult)
+    nonce = secrets.token_urlsafe(16)
+    await debit_wallet(u, bet, "game_entry", meta={"mode": "aviator"})
+    if force_win:
+        await db.users.update_one({"_id": u["_id"]}, {"$set": {"force_win": False}})
+    session = {
+        "id": str(uuid.uuid4()),
+        "user_id": str(user["_id"]),
+        "mode": "aviator",
+        "entry_fee": bet,
+        "crash_point": crash_point,
+        "growth_rate": ac.get("growth_rate", 0.12),
+        "nonce": nonce,
+        "status": "active",
+        "force_win": force_win,
+        "server_start": datetime.now(timezone.utc).timestamp(),
+        "created_at": now_iso(),
+    }
+    await db.game_sessions.insert_one(dict(session))
+    await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": bet}})
+    return {"session_id": session["id"], "nonce": nonce, "entry_fee": bet,
+            "crash_point": crash_point, "growth_rate": session["growth_rate"],
+            "max_multiplier": max_mult}
+
+
+@api.post("/games/aviator/cashout")
+async def aviator_cashout(body: AviatorCashoutReq, user: dict = Depends(get_current_user)):
+    session = await db.game_sessions.find_one({"id": body.session_id})
+    if not session or session["mode"] != "aviator":
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session["user_id"] != str(user["_id"]):
+        raise HTTPException(status_code=403, detail="Not your session")
+    if session["status"] != "active":
+        raise HTTPException(status_code=409, detail="Round already settled")
+    if session["nonce"] != body.nonce:
+        raise HTTPException(status_code=403, detail="Invalid session token")
+    import math
+    k = session.get("growth_rate", 0.12)
+    server_elapsed = datetime.now(timezone.utc).timestamp() - session["server_start"]
+    server_mult = math.exp(k * (server_elapsed + LATENCY_BOUND))
+    claimed = round(float(body.multiplier), 2)
+    crash = session["crash_point"]
+    mult = min(claimed, round(server_mult, 2))
+    mult = max(1.00, mult)
+    won = mult < crash
+    prize = round(session["entry_fee"] * mult, 2) if won else 0.0
+    cashed = round(mult, 2) if won else 0.0
+    await db.game_sessions.update_one({"id": session["id"]}, {"$set": {
+        "status": "completed", "cashout_mult": cashed, "crash_point": crash,
+        "won": won, "prize_awarded": prize, "stopped_at": now_iso()}})
+    game_record = {
+        "id": str(uuid.uuid4()),
+        "game_id": "GM" + uuid.uuid4().hex[:10].upper(),
+        "user_id": str(user["_id"]),
+        "mode": "aviator",
+        "target": crash,
+        "recorded": cashed,
+        "diff": 0.0,
+        "entry_fee": session["entry_fee"],
+        "prize": prize,
+        "result": "won" if won else "lost",
+        "flagged": False,
+        "created_at": now_iso(),
+    }
+    await db.games.insert_one(dict(game_record))
+    inc = {"stats.games_played": 1}
+    if won:
+        inc["stats.games_won"] = 1
+        inc["stats.total_prizes"] = prize
+        await credit_wallet(str(user["_id"]), prize, "prize", "main",
+                            meta={"mode": "aviator", "game_id": game_record["game_id"], "multiplier": cashed})
+    await db.users.update_one({"_id": user["_id"]}, {"$inc": inc})
+    await pay_referral_commission(str(user["_id"]), won, session["entry_fee"], prize)
+    game_record.pop("_id", None)
+    return {"won": won, "multiplier": cashed, "crash_point": crash, "prize": prize,
+            "game": game_record, "wallet": await get_wallet(user)}
+
+
+@api.post("/games/tower/start")
+async def tower_start(body: TowerStartReq, user: dict = Depends(get_current_user)):
+    cfg = await get_config()
+    tc = cfg.get("tower_config", {})
+    if not cfg["game_enabled"] or not tc.get("enabled", True):
+        raise HTTPException(status_code=403, detail="Tower is currently disabled")
+    diff = body.difficulty if body.difficulty in tc.get("difficulties", {}) else "easy"
+    d = tc["difficulties"][diff]
+    cols, bombs = d["cols"], d["bombs"]
+    rows = tc.get("rows", 8)
+    bet = round(float(body.bet), 2)
+    if bet < tc.get("min_bet", 20):
+        raise HTTPException(status_code=400, detail=f"Minimum bet is {tc.get('min_bet', 20)} coins")
+    if bet > tc.get("max_bet", 5000):
+        raise HTTPException(status_code=400, detail=f"Maximum bet is {tc.get('max_bet', 5000)} coins")
+    u = await get_user_by_id(str(user["_id"]))
+    if u.get("main_balance", 0) + u.get("bonus_balance", 0) < bet:
+        raise HTTPException(status_code=400, detail="Insufficient balance for this bet")
+    await db.game_sessions.update_many(
+        {"user_id": str(user["_id"]), "mode": "tower", "status": "active"},
+        {"$set": {"status": "abandoned"}})
+    force_win = bool(u.get("force_win"))
+    bombs_layout = [sorted(random.sample(range(cols), bombs)) for _ in range(rows)]
+    mults = tower_multipliers(cols, bombs, rows, tc.get("house_edge_percent", 5))
+    nonce = secrets.token_urlsafe(16)
+    await debit_wallet(u, bet, "game_entry", meta={"mode": "tower", "difficulty": diff})
+    if force_win:
+        await db.users.update_one({"_id": u["_id"]}, {"$set": {"force_win": False}})
+    session = {
+        "id": str(uuid.uuid4()),
+        "user_id": str(user["_id"]),
+        "mode": "tower",
+        "difficulty": diff,
+        "cols": cols,
+        "bombs": bombs,
+        "rows": rows,
+        "entry_fee": bet,
+        "bombs_layout": bombs_layout,
+        "multipliers": mults,
+        "current_row": 0,
+        "nonce": nonce,
+        "status": "active",
+        "force_win": force_win,
+        "created_at": now_iso(),
+    }
+    await db.game_sessions.insert_one(dict(session))
+    await db.users.update_one({"_id": u["_id"]}, {"$inc": {"stats.total_entries": bet}})
+    return {"session_id": session["id"], "nonce": nonce, "entry_fee": bet,
+            "difficulty": diff, "cols": cols, "bombs": bombs, "rows": rows,
+            "multipliers": mults}
+
+
+async def _settle_tower(session: dict, user: dict, won: bool, cashed_row: int):
+    mults = session["multipliers"]
+    mult = mults[cashed_row - 1] if won and cashed_row > 0 else 0.0
+    prize = round(session["entry_fee"] * mult, 2) if won else 0.0
+    await db.game_sessions.update_one({"id": session["id"]}, {"$set": {
+        "status": "completed", "won": won, "prize_awarded": prize,
+        "cashed_row": cashed_row, "stopped_at": now_iso()}})
+    game_record = {
+        "id": str(uuid.uuid4()),
+        "game_id": "GM" + uuid.uuid4().hex[:10].upper(),
+        "user_id": session["user_id"],
+        "mode": "tower",
+        "target": session["rows"],
+        "recorded": cashed_row,
+        "diff": 0.0,
+        "entry_fee": session["entry_fee"],
+        "prize": prize,
+        "result": "won" if won else "lost",
+        "flagged": False,
+        "created_at": now_iso(),
+    }
+    await db.games.insert_one(dict(game_record))
+    inc = {"stats.games_played": 1}
+    if won:
+        inc["stats.games_won"] = 1
+        inc["stats.total_prizes"] = prize
+        await credit_wallet(session["user_id"], prize, "prize", "main",
+                            meta={"mode": "tower", "game_id": game_record["game_id"]})
+    await db.users.update_one({"_id": ObjectId(session["user_id"])}, {"$inc": inc})
+    await pay_referral_commission(session["user_id"], won, session["entry_fee"], prize)
+    return prize, round(mult, 2)
+
+
+@api.post("/games/tower/pick")
+async def tower_pick(body: TowerPickReq, user: dict = Depends(get_current_user)):
+    session = await db.game_sessions.find_one({"id": body.session_id})
+    if not session or session["mode"] != "tower":
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session["user_id"] != str(user["_id"]):
+        raise HTTPException(status_code=403, detail="Not your session")
+    if session["status"] != "active":
+        raise HTTPException(status_code=409, detail="Game already finished")
+    if session["nonce"] != body.nonce:
+        raise HTTPException(status_code=403, detail="Invalid session token")
+    row = session["current_row"]
+    if body.col < 0 or body.col >= session["cols"]:
+        raise HTTPException(status_code=400, detail="Invalid tile")
+    bombs_row = session["bombs_layout"][row]
+    is_bomb = (body.col in bombs_row) and not session.get("force_win")
+    if is_bomb:
+        prize, _ = await _settle_tower(session, user, won=False, cashed_row=row)
+        return {"safe": False, "lost": True, "row": row, "col": body.col,
+                "bombs_layout": session["bombs_layout"], "prize": 0.0,
+                "wallet": await get_wallet(user)}
+    new_row = row + 1
+    await db.game_sessions.update_one({"id": session["id"]}, {"$set": {"current_row": new_row}})
+    mult = session["multipliers"][row]
+    finished = new_row >= session["rows"]
+    if finished:
+        prize, m = await _settle_tower(session, user, won=True, cashed_row=new_row)
+        return {"safe": True, "finished": True, "row": new_row, "col": body.col,
+                "multiplier": m, "prize": prize, "bombs_layout": session["bombs_layout"],
+                "wallet": await get_wallet(user)}
+    return {"safe": True, "finished": False, "row": new_row, "col": body.col,
+            "multiplier": round(mult, 2), "next_multiplier": session["multipliers"][new_row],
+            "cashout_value": round(session["entry_fee"] * mult, 2)}
+
+
+@api.post("/games/tower/cashout")
+async def tower_cashout(body: TowerCashoutReq, user: dict = Depends(get_current_user)):
+    session = await db.game_sessions.find_one({"id": body.session_id})
+    if not session or session["mode"] != "tower":
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session["user_id"] != str(user["_id"]):
+        raise HTTPException(status_code=403, detail="Not your session")
+    if session["status"] != "active":
+        raise HTTPException(status_code=409, detail="Game already finished")
+    if session["nonce"] != body.nonce:
+        raise HTTPException(status_code=403, detail="Invalid session token")
+    row = session["current_row"]
+    if row <= 0:
+        raise HTTPException(status_code=400, detail="Clear at least one row before cashing out")
+    prize, m = await _settle_tower(session, user, won=True, cashed_row=row)
+    return {"won": True, "cashed_row": row, "multiplier": m, "prize": prize,
+            "bombs_layout": session["bombs_layout"], "wallet": await get_wallet(user)}
 
 
 @api.get("/games/history")

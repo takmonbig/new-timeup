@@ -1,9 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Swords, Users, User, Trophy } from "lucide-react";
+import { Gamepad2, Swords, Users, User, Trophy } from "lucide-react";
 
 const items = [
-  { to: "/home", label: "Home", icon: Home },
+  { to: "/home", label: "Games", icon: Gamepad2 },
   { to: "/1v1", label: "1v1", icon: Swords },
   { to: "/multiplayer", label: "Rooms", icon: Users },
   { to: "/leaderboard", label: "Ranks", icon: Trophy },
@@ -16,7 +16,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 inset-x-0 z-50 pz-glass border-t border-white/10" data-testid="bottom-nav">
       <div className="mx-auto max-w-lg grid grid-cols-5">
         {items.map((it) => {
-          const active = loc.pathname === it.to || (it.to !== "/home" && loc.pathname.startsWith(it.to));
+          const active = it.to === "/home" ? (loc.pathname === "/home" || loc.pathname.startsWith("/games")) : loc.pathname.startsWith(it.to);
           return (
             <Link key={it.to} to={it.to} data-testid={`bottomnav-${it.label.toLowerCase()}`}
               className="relative flex flex-col items-center gap-1 py-2.5 group">

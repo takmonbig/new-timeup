@@ -9,6 +9,9 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Splash from "@/pages/Splash";
 import GameHome from "@/pages/GameHome";
+import GamesHub from "@/pages/GamesHub";
+import Aviator from "@/pages/Aviator";
+import Tower from "@/pages/Tower";
 import OneVsOne from "@/pages/OneVsOne";
 import Multiplayer from "@/pages/Multiplayer";
 import Leaderboard from "@/pages/Leaderboard";
@@ -42,7 +45,10 @@ function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/splash" element={<Splash />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/home" element={<GameHome />} />
+              <Route path="/home" element={<GamesHub />} />
+              <Route path="/games/stopwatch" element={<GameHome />} />
+              <Route path="/games/aviator" element={<Aviator />} />
+              <Route path="/games/tower" element={<Tower />} />
               <Route path="/1v1" element={<OneVsOne />} />
               <Route path="/multiplayer" element={<Multiplayer />} />
               <Route path="/leaderboard" element={<Leaderboard />} />

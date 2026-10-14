@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Target, Loader2, Trophy, RotateCcw, Coins, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Target, Loader2, RotateCcw, Coins, Sparkles, ArrowLeft } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import Stopwatch from "@/components/Stopwatch";
-import { DailyReward } from "@/components/DailyReward";
 import { Guide } from "@/components/Guide";
 import { showPopup } from "@/components/CenterPopup";
 import { showWin } from "@/components/WinCelebration";
@@ -78,6 +78,7 @@ export default function GameHome() {
     }
     const t = setTimeout(() => setCount((c) => c - 1), 700);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, count]);
 
   const stop = async () => {
@@ -103,9 +104,8 @@ export default function GameHome() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       {phase === "select" && <Guide />}
-      {phase === "select" && <DailyReward />}
-
       <div className="flex items-center gap-2 mb-1">
+        <Link to="/home" data-testid="stopwatch-back" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center mr-1"><ArrowLeft className="h-4 w-4" /></Link>
         <Target className="h-5 w-5 text-pazer-red" />
         <h1 className="font-display font-bold text-2xl tracking-tight">Fixed Challenge</h1>
       </div>

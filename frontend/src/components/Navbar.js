@@ -14,6 +14,7 @@ export function Navbar() {
 
   useEffect(() => {
     if (user) api.get("/wallet").then(({ data }) => setBalance(data.total_balance)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, loc.pathname]);
 
   useEffect(() => {

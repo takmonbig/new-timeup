@@ -21,10 +21,17 @@ function make() {
 
 export function WinTicker() {
   const [item, setItem] = useState(make());
+  const [gameActive, setGameActive] = useState(false);
+  useEffect(() => {
+    const h = (e) => setGameActive(!!e.detail);
+    window.addEventListener("game:active", h);
+    return () => window.removeEventListener("game:active", h);
+  }, []);
   useEffect(() => {
     const i = setInterval(() => setItem(make()), 5000);
     return () => clearInterval(i);
   }, []);
+  if (gameActive) return null;
   return (
     <div className="fixed bottom-[130px] inset-x-0 z-30 pointer-events-none" data-testid="win-ticker">
       <div className="mx-auto max-w-md px-3">

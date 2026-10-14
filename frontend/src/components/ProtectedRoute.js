@@ -57,7 +57,7 @@ export function ProtectedRoute({ adminOnly }) {
     );
   }
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen pb-44">
       <SciFiBackground />
       <CenterPopupHost />
       <WinCelebrationHost />

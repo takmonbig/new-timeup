@@ -28,6 +28,11 @@ export default function GameHome() {
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent("game:active", { detail: phase !== "select" }));
+  }, [phase]);
+  useEffect(() => () => window.dispatchEvent(new CustomEvent("game:active", { detail: false })), []);
+
+  useEffect(() => {
     api.get("/config/public").then(({ data }) => {
       setCfg(data.fixed_config);
       setBet(data.fixed_config.min_bet);

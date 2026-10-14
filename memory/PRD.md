@@ -116,3 +116,14 @@ UX/feature overhaul (verified iter5 14/14 + full regression, all critical fronte
 - User /login now rejects admin-role accounts with generic "Invalid credentials." (hides admin from user portal).
 - Daily free coin (login streak) reward raised from 5 → 20 (backend DEFAULT_CONFIG.streak_config.daily_bonus=20 + live DB config updated + GET /api/streak & POST /api/streak/claim credit 20).
 - Verified: testing_agent iter8 — backend 3/3, frontend 6/6 flows PASS.
+
+## Iteration 9 — Games Hub, Aviator & Tower frontend (2026-06)
+- `/home` is now the **Games Hub** (3 cards: Stopwatch, Aviator, Tower + daily reward + onboarding guide). Bottom-nav "Home" renamed "Games".
+- Stopwatch moved to `/games/stopwatch` (back button to hub). Fixed eslint hook warnings (GameHome, Navbar).
+- **Aviator** `/games/aviator`: canvas crash game (parallax stars/ridges/grid, glowing curve, shaded animated plane with exhaust trail, crash explosion), big live multiplier, bet + quick chips, Auto Cash-out at X, CASH OUT button with live win, recent crash history pills (localStorage).
+- **Tower** `/games/tower`: Easy/Medium/Hard (4/3/2 tiles, 1 bomb, 8 rows), rows bottom→top with per-row multiplier, gems/bombs, reveal all bombs on loss/cashout, Cash Out anytime.
+- Verified iteration_9: backend 9/9, all frontend flows pass.
+
+## Backlog
+- P1: Clean template for duplicating project per client.
+- P2: Admin UI controls for aviator_config/tower_config; WebSockets for rooms; Streak ladder; admin dashboard summary; refactor server.py into routers.

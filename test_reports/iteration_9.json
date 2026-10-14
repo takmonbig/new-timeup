@@ -1,0 +1,37 @@
+{
+  "summary": "Tested TIMEUP iteration 9: Games Hub (/home replaced with 3-card hub), Aviator (new canvas crash game), Tower (new multi-row game), plus Stopwatch regression and admin isolation. Backend 9/9 passing (test_aviator_tower.py). Frontend flows all working: hub cards present, bottomnav-games active on /home and /games/*, Aviator start/auto-cashout/manual-cashout/history/reset-to-idle all verified, Tower difficulty switches show 4/3/2 tiles correctly, start debits wallet, bomb hit reveals bombs_layout. All data-testids correct per spec.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/games/stopwatch onboarding Guide", "issues": ["Guide text still says 'Home = Fixed Challenge' but /home is now the Games Hub (not Fixed Challenge). Copy is stale after reorg. Guide also autoshows on stopwatch route and briefly blocks stopwatch-back navigation; it has a backdrop with no visible dismiss affordance beyond small X & 'Next'. Consider auto-dismissing or moving Guide to Games Hub page."]},
+      {"screen": "/login", "issues": ["Pre-existing: React hydration warning 'In HTML, <span> cannot be a child of <option>' from country select; flags rendered as span inside option (COUNTRIES component). Minor, not iteration-9 scope."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_aviator_tower.py",
+    "/app/test_reports/pytest/iter9_games.xml"
+  ],
+  "action_items": [
+    "Update Guide copy on /games/stopwatch: 'Home = Fixed Challenge' is outdated now that /home is the Games Hub. Either move Guide to Games Hub or re-word to 'Fixed Challenge' only (no 'Home =').",
+    "(Nice-to-have) Fix pre-existing login country <option><span> hydration warning by rendering flag as text instead of span."
+  ],
+  "critical_code_review_comments": [
+    "server.py gen_crash_point: ~5% instant crash at 1.00 implemented via `if r < he: return 1.00` — matches spec; good.",
+    "Aviator cashout server_mult uses LATENCY_BOUND to bound claimed multiplier; properly rejects over-claims via min(claimed, server_mult). Secure.",
+    "Tower bombs_layout returned only on terminal state (bomb hit / finish / cashout) — correct info-hiding during play.",
+    "/games/aviator/start returns crash_point to client (as expected for client-side animation) which the frontend uses in canvas.fly(); server still re-validates on cashout, so no cheat risk, but worth documenting that this is intentional design.",
+    "AviatorCanvas computes server_elapsed on cashout from server_start timestamp, enforcing realism — good.",
+    "Minor: Aviator session created even if debit_wallet fails before insert — code order looks ok (debit before insert), but if debit raises, no session leak occurs. OK.",
+    "Pre-existing: Some callers to credit_wallet pass str user_id and others ObjectId — currently handled, but keeping types consistent would be cleaner."
+  ],
+  "updated_files": ["/app/backend/tests/test_aviator_tower.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% core flows"},
+  "test_credentials": "User 8800112233 / Test@123 (balance topped-up to 10000). Admin 9999999999 / Admin@123.",
+  "seed_data_creation": "Set user 8800112233 main_balance=10000 via Mongo for test runs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests at /app/backend/tests/test_aviator_tower.py are reusable (fixture auto-registers user & tops up balance). Aviator UI uses data-testid aviator-{bet-input, quickbet-{20,50,100,200,500}, bet-btn, cashout-btn, cashed-badge, flew-away, multiplier, history, auto-toggle, auto-input, back}. Tower uses tower-{diff-{easy,medium,hard}, bet-input, quickbet-20..500, start-btn, cashout-btn, tile-{row}-{col}, top-prize, back}. Row 0 is bottom. Note onboarding Guide blocks interaction on /games/stopwatch until dismissed; use get_by_role('button', name='Next') until gone or click guide close button.",
+  "rca of the issue": "N/A — no bugs found in iteration-9 scope. Only pre-existing design nit (stale Guide copy) and pre-existing login hydration warning observed."
+}

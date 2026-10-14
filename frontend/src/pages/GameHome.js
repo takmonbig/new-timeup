@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { Target, Loader2, RotateCcw, Coins, Sparkles, ArrowLeft } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import Stopwatch from "@/components/Stopwatch";
-import { Guide } from "@/components/Guide";
 import { showPopup } from "@/components/CenterPopup";
 import { showWin } from "@/components/WinCelebration";
 import { fbTrack } from "@/lib/siteConfig";
@@ -103,7 +102,6 @@ export default function GameHome() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      {phase === "select" && <Guide />}
       <div className="flex items-center gap-2 mb-1">
         <Link to="/home" data-testid="stopwatch-back" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center mr-1"><ArrowLeft className="h-4 w-4" /></Link>
         <Target className="h-5 w-5 text-pazer-red" />

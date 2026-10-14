@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Target, Home, Swords, Users, Trophy } from "lucide-react";
+import { X, Gamepad2, Plane, Castle, Swords, Users, Trophy } from "lucide-react";
 
 const STEPS = [
-  { icon: Home, title: "Home = Fixed Challenge", text: "Pick a target time and your bet, then stop the clock EXACTLY at the target to win 5×." },
+  { icon: Gamepad2, title: "Games Hub", text: "Stopwatch: stop the clock EXACTLY at the target to win 5×." },
+  { icon: Plane, title: "Aviator", text: "Watch the multiplier climb and cash out before the plane flies away." },
+  { icon: Castle, title: "Tower", text: "Pick safe tiles row by row, dodge the bombs and cash out anytime." },
   { icon: Swords, title: "1v1 Duels", text: "Face one opponent for 50 coins. Closest to the target wins 1.5×." },
   { icon: Users, title: "Multiplayer Rooms", text: "Up to 25 players. The closest timing takes the prize pool." },
   { icon: Trophy, title: "Ranks & Rewards", text: "Climb the weekly leaderboard and claim your daily login bonus." },

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Timer, Plane, Castle, ChevronRight, Gamepad2 } from "lucide-react";
 import { DailyReward } from "@/components/DailyReward";
+import { Guide } from "@/components/Guide";
 
 const IMG = "https://static.prod-images.emergentagent.com/jobs/670c5923-c1f4-4298-9135-36fea583d12c/images/";
 const GAMES = [
@@ -41,6 +42,7 @@ function GameCard({ g, i }) {
 export default function GamesHub() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-40" data-testid="games-hub">
+      <Guide />
       <DailyReward />
       <div className="flex items-center gap-2 mb-1">
         <Gamepad2 className="h-5 w-5 text-pazer-red" />
